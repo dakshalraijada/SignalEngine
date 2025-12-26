@@ -1,0 +1,21 @@
+<div style="padding: 20px;">
+  <h1>Welcome to SignalEngine</h1>
+  
+  <div *ngIf="isAuthenticated">
+    <p>You are logged in!</p>
+    
+    <div *ngIf="userData">
+      <h3>User Information:</h3>
+      <p><strong>Name:</strong> {{ userData.name || userData.preferred_username }}</p>
+      <p><strong>Email:</strong> {{ userData.email }}</p>
+    </div>
+
+    <button (click)="logout()" style="margin-top: 20px; padding: 10px 20px; cursor: pointer;">
+      Logout
+    </button>
+  </div>
+
+  <div *ngIf="!isAuthenticated">
+    <p>Please wait, checking authentication...</p>
+  </div>
+</div>

@@ -1,0 +1,6 @@
+@SignalEngine.SystemApi_HostAddress = http://localhost:5293
+
+GET {{SignalEngine.SystemApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

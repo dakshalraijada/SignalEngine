@@ -1,0 +1,81 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using SignalEngine.Application.Common.Interfaces;
+using SignalEngine.Infrastructure.Identity;
+using SignalEngine.Infrastructure.Persistence;
+using SignalEngine.Infrastructure.Repositories;
+using SignalEngine.Infrastructure.Services;
+
+namespace SignalEngine.Infrastructure;
+
+/// <summary>
+/// Dependency injection configuration for the Infrastructure layer.
+/// </summary>
+public static class DependencyInjection
+{
+    public static IServiceCollection AddInfrastructureServices(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        bool includeDataSeeder = true)
+    {
+        var connectionString = configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+
+        // Configure DbContext
+        services.AddDbContext<ApplicationDbContext>(options =>
+        {
+            options.UseSqlServer(connectionString);
+            
+            // Only configure OpenIddict stores if we're including data seeder (i.e., IdentityServer)
+            if (includeDataSeeder)
+            {
+                options.UseOpenIddict();
+            }
+        });
+
+        // Configure Identity
+        services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
+        {
+            options.Password.RequireDigit = true;
+            options.Password.RequireLowercase = true;
+            options.Password.RequireUppercase = true;
+            options.Password.RequireNonAlphanumeric = true;
+            options.Password.RequiredLength = 8;
+            options.User.RequireUniqueEmail = true;
+            options.SignIn.RequireConfirmedEmail = false;
+        })
+        .AddEntityFrameworkStores<ApplicationDbContext>()
+        .AddDefaultTokenProviders();
+
+        // Register repositories
+        services.AddScoped<ILookupRepository, LookupRepository>();
+        services.AddScoped<IRuleRepository, RuleRepository>();
+        services.AddScoped<ISignalRepository, SignalRepository>();
+        services.AddScoped<ISignalStateRepository, SignalStateRepository>();
+        services.AddScoped<IMetricRepository, MetricRepository>();
+        services.AddScoped<IAssetRepository, AssetRepository>();
+        services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<IPlanRepository, PlanRepository>();
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ApplicationDbContext>());
+
+        // Register services
+        services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
+        
+        // Only register DataSeeder for IdentityServer (needs OpenIddict managers)
+        if (includeDataSeeder)
+        {
+            services.AddScoped<DataSeeder>();
+        }
+
+        return services;
+    }
+
+    public static IServiceCollection AddBackgroundServices(this IServiceCollection services)
+    {
+        services.AddHostedService<RuleEvaluationBackgroundService>();
+        return services;
+    }
+}
