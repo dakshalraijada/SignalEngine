@@ -1,4 +1,5 @@
 using SignalEngine.Application;
+using SignalEngine.Application.Common.Interfaces;
 using SignalEngine.Infrastructure;
 using SignalEngine.Worker.Options;
 using SignalEngine.Worker.Services;
@@ -9,6 +10,10 @@ var builder = Host.CreateApplicationBuilder(args);
 // Configure services from Application and Infrastructure layers
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration, includeDataSeeder: false);
+
+// Register system-level current user service for background workers
+// This returns null TenantId, which disables tenant filtering for system operations
+builder.Services.AddScoped<ICurrentUserService, SystemCurrentUserService>();
 
 // Configure rule evaluation options
 builder.Services.Configure<RuleEvaluationOptions>(

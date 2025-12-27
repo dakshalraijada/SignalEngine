@@ -63,6 +63,9 @@ public static class DependencyInjection
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ApplicationDbContext>());
 
+        // Register tenant accessor for multi-tenant query filtering
+        services.AddScoped<ITenantAccessor, TenantAccessor>();
+
         // Register services
         services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
         

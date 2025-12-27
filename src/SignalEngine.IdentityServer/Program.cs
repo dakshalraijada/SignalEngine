@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using SignalEngine.Application.Common.Interfaces;
+using SignalEngine.IdentityServer.Services;
 using SignalEngine.Infrastructure;
 using SignalEngine.Infrastructure.Identity;
 using SignalEngine.Infrastructure.Persistence;
@@ -8,6 +10,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add Infrastructure services
 builder.Services.AddInfrastructureServices(builder.Configuration);
+
+// Register system-level current user service for IdentityServer
+// This returns null TenantId, which disables tenant filtering for data seeding
+builder.Services.AddScoped<ICurrentUserService, SystemCurrentUserService>();
 
 // Configure CORS
 builder.Services.AddCors(options =>
