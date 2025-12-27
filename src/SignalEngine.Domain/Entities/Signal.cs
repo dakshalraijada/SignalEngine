@@ -4,7 +4,8 @@ namespace SignalEngine.Domain.Entities;
 
 /// <summary>
 /// Represents a signal generated when a rule is breached.
-/// SignalStatusId references LookupValues (SIGNAL_STATUS: OPEN, RESOLVED).
+/// Signals are immutable after creation - resolutions are tracked via SignalResolution.
+/// SignalStatusId references LookupValues (SIGNAL_STATUS: OPEN).
 /// </summary>
 public class Signal : AuditableEntity, ITenantScoped
 {
@@ -17,9 +18,12 @@ public class Signal : AuditableEntity, ITenantScoped
     public decimal TriggerValue { get; private set; }
     public decimal ThresholdValue { get; private set; }
     public DateTime TriggeredAt { get; private set; }
-    public DateTime? ResolvedAt { get; private set; }
-    public int? ResolvedBy { get; private set; }
-    public string? ResolutionNotes { get; private set; }
+
+    // Navigation properties
+    public LookupValue? SignalStatus { get; private set; }
+    public Asset? Asset { get; private set; }
+    public Rule? Rule { get; private set; }
+    public SignalResolution? Resolution { get; private set; }
 
     private readonly List<Notification> _notifications = new();
     public IReadOnlyCollection<Notification> Notifications => _notifications.AsReadOnly();
@@ -61,24 +65,5 @@ public class Signal : AuditableEntity, ITenantScoped
         ThresholdValue = thresholdValue;
         TriggeredAt = triggeredAt;
         Description = description;
-    }
-
-    public void Resolve(int resolvedStatusId, int userId, string? notes = null)
-    {
-        if (resolvedStatusId <= 0)
-            throw new ArgumentException("Resolved status ID must be positive.", nameof(resolvedStatusId));
-
-        SignalStatusId = resolvedStatusId;
-        ResolvedAt = DateTime.UtcNow;
-        ResolvedBy = userId;
-        ResolutionNotes = notes;
-    }
-
-    public void UpdateStatus(int statusId)
-    {
-        if (statusId <= 0)
-            throw new ArgumentException("Status ID must be positive.", nameof(statusId));
-
-        SignalStatusId = statusId;
     }
 }

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using SignalEngine.Domain.Entities;
 
 namespace SignalEngine.Infrastructure.Identity;
 
@@ -13,4 +14,7 @@ public class ApplicationUser : IdentityUser
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? LastLoginAt { get; set; }
     public bool IsActive { get; set; } = true;
+
+    // Navigation property
+    public Tenant? Tenant { get; set; }
 }

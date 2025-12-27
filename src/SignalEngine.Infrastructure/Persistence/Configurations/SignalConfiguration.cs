@@ -45,19 +45,31 @@ public class SignalConfiguration : IEntityTypeConfiguration<Signal>
         builder.Property(e => e.TriggeredAt)
             .IsRequired();
 
-        builder.Property(e => e.ResolutionNotes)
-            .HasMaxLength(2000);
-
         builder.Property(e => e.CreatedAt)
             .IsRequired();
 
+        // Indexes
         builder.HasIndex(e => e.TenantId);
         builder.HasIndex(e => e.RuleId);
         builder.HasIndex(e => e.SignalStatusId);
-        builder.HasIndex(e => e.TriggeredAt);
+        builder.HasIndex(e => new { e.TenantId, e.TriggeredAt })
+            .IsDescending(false, true)
+            .HasDatabaseName("IX_Signals_TenantId_TriggeredAt");
+
+        // Foreign key to LookupValues for SignalStatus
+        builder.HasOne(e => e.SignalStatus)
+            .WithMany()
+            .HasForeignKey(e => e.SignalStatusId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Foreign key to Assets
+        builder.HasOne(e => e.Asset)
+            .WithMany()
+            .HasForeignKey(e => e.AssetId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(e => e.Notifications)
-            .WithOne()
+            .WithOne(n => n.Signal)
             .HasForeignKey(e => e.SignalId)
             .OnDelete(DeleteBehavior.Restrict);
     }

@@ -28,24 +28,27 @@ public class MetricConfiguration : IEntityTypeConfiguration<Metric>
         builder.Property(e => e.MetricTypeId)
             .IsRequired();
 
-        builder.Property(e => e.Value)
-            .IsRequired()
-            .HasPrecision(18, 6);
-
-        builder.Property(e => e.Timestamp)
-            .IsRequired();
-
         builder.Property(e => e.Unit)
             .HasMaxLength(50);
 
         builder.Property(e => e.Source)
             .HasMaxLength(200);
 
+        builder.Property(e => e.IsActive)
+            .IsRequired()
+            .HasDefaultValue(true);
+
         builder.Property(e => e.CreatedAt)
             .IsRequired();
 
         builder.HasIndex(e => e.TenantId);
-        builder.HasIndex(e => new { e.AssetId, e.Name });
-        builder.HasIndex(e => e.Timestamp);
+        builder.HasIndex(e => new { e.AssetId, e.Name })
+            .IsUnique();
+
+        // Foreign key to LookupValues for MetricType
+        builder.HasOne(e => e.MetricType)
+            .WithMany()
+            .HasForeignKey(e => e.MetricTypeId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -81,8 +81,8 @@ public class SignalsController : ControllerBase
         var statistics = new SignalStatistics
         {
             TotalCount = signalList.Count,
-            OpenCount = signalList.Count(s => s.ResolvedAt == null),
-            ResolvedCount = signalList.Count(s => s.ResolvedAt != null)
+            OpenCount = signalList.Count(s => s.Resolution == null),
+            ResolvedCount = signalList.Count(s => s.Resolution != null)
         };
 
         return Ok(statistics);

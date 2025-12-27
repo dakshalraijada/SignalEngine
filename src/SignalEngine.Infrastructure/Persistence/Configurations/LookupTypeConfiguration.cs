@@ -23,11 +23,14 @@ public class LookupTypeConfiguration : IEntityTypeConfiguration<LookupType>
             .IsRequired()
             .HasMaxLength(200);
 
+        builder.Property(e => e.CreatedAt)
+            .IsRequired();
+
         builder.HasIndex(e => e.Code)
             .IsUnique();
 
         builder.HasMany(e => e.LookupValues)
-            .WithOne()
+            .WithOne(v => v.LookupType)
             .HasForeignKey(e => e.LookupTypeId)
             .OnDelete(DeleteBehavior.Restrict);
     }

@@ -14,6 +14,10 @@ public class Tenant : AuditableEntity
     public int PlanId { get; private set; }
     public bool IsActive { get; private set; }
 
+    // Navigation properties
+    public LookupValue? TenantType { get; private set; }
+    public Plan? Plan { get; private set; }
+
     private readonly List<Asset> _assets = new();
     public IReadOnlyCollection<Asset> Assets => _assets.AsReadOnly();
 

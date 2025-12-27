@@ -39,13 +39,25 @@ public class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.HasIndex(e => e.Subdomain)
             .IsUnique();
 
+        // Foreign key to LookupValues for TenantType
+        builder.HasOne(e => e.TenantType)
+            .WithMany()
+            .HasForeignKey(e => e.TenantTypeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Foreign key to Plans
+        builder.HasOne(e => e.Plan)
+            .WithMany()
+            .HasForeignKey(e => e.PlanId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasMany(e => e.Assets)
-            .WithOne()
+            .WithOne(a => a.Tenant)
             .HasForeignKey(e => e.TenantId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(e => e.Rules)
-            .WithOne()
+            .WithOne(r => r.Tenant)
             .HasForeignKey(e => e.TenantId)
             .OnDelete(DeleteBehavior.Restrict);
     }

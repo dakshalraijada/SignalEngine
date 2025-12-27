@@ -18,6 +18,9 @@ public class Plan : AuditableEntity
     public decimal MonthlyPrice { get; private set; }
     public bool IsActive { get; private set; }
 
+    // Navigation properties
+    public LookupValue? PlanCode { get; private set; }
+
     private Plan() { } // EF Core
 
     public Plan(

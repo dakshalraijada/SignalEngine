@@ -47,13 +47,19 @@ public class AssetConfiguration : IEntityTypeConfiguration<Asset>
         builder.HasIndex(e => new { e.TenantId, e.Identifier })
             .IsUnique();
 
+        // Foreign key to LookupValues for AssetType
+        builder.HasOne(e => e.AssetType)
+            .WithMany()
+            .HasForeignKey(e => e.AssetTypeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasMany(e => e.Metrics)
-            .WithOne()
+            .WithOne(m => m.Asset)
             .HasForeignKey(e => e.AssetId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(e => e.Rules)
-            .WithOne()
+            .WithOne(r => r.Asset)
             .HasForeignKey(e => e.AssetId)
             .OnDelete(DeleteBehavior.Restrict);
     }

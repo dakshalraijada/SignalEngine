@@ -13,6 +13,7 @@ public class EvaluateRulesCommandHandler : IRequestHandler<EvaluateRulesCommand,
 {
     private readonly IRuleRepository _ruleRepository;
     private readonly IMetricRepository _metricRepository;
+    private readonly IMetricDataRepository _metricDataRepository;
     private readonly ISignalRepository _signalRepository;
     private readonly ISignalStateRepository _signalStateRepository;
     private readonly ILookupRepository _lookupRepository;
@@ -24,6 +25,7 @@ public class EvaluateRulesCommandHandler : IRequestHandler<EvaluateRulesCommand,
     public EvaluateRulesCommandHandler(
         IRuleRepository ruleRepository,
         IMetricRepository metricRepository,
+        IMetricDataRepository metricDataRepository,
         ISignalRepository signalRepository,
         ISignalStateRepository signalStateRepository,
         ILookupRepository lookupRepository,
@@ -34,6 +36,7 @@ public class EvaluateRulesCommandHandler : IRequestHandler<EvaluateRulesCommand,
     {
         _ruleRepository = ruleRepository;
         _metricRepository = metricRepository;
+        _metricDataRepository = metricDataRepository;
         _signalRepository = signalRepository;
         _signalStateRepository = signalStateRepository;
         _lookupRepository = lookupRepository;
@@ -114,8 +117,8 @@ public class EvaluateRulesCommandHandler : IRequestHandler<EvaluateRulesCommand,
 
     private async Task<bool> EvaluateRuleAsync(Rule rule, CancellationToken cancellationToken)
     {
-        // Get latest metric for this rule
-        var metric = await _metricRepository.GetLatestByAssetAndNameAsync(
+        // Get metric definition for this rule
+        var metric = await _metricRepository.GetByAssetAndNameAsync(
             rule.AssetId, 
             rule.MetricName, 
             cancellationToken);
@@ -123,8 +126,19 @@ public class EvaluateRulesCommandHandler : IRequestHandler<EvaluateRulesCommand,
         if (metric == null)
         {
             _logger.LogDebug(
-                "No metric found for rule {RuleId}, asset {AssetId}, metric {MetricName}",
+                "No metric definition found for rule {RuleId}, asset {AssetId}, metric {MetricName}",
                 rule.Id, rule.AssetId, rule.MetricName);
+            return false;
+        }
+
+        // Get the latest data point for this metric
+        var latestData = await _metricDataRepository.GetLatestByMetricIdAsync(metric.Id, cancellationToken);
+
+        if (latestData == null)
+        {
+            _logger.LogDebug(
+                "No metric data found for rule {RuleId}, metric {MetricId}",
+                rule.Id, metric.Id);
             return false;
         }
 
@@ -137,24 +151,24 @@ public class EvaluateRulesCommandHandler : IRequestHandler<EvaluateRulesCommand,
         // Get operator code for evaluation
         var operatorCode = await _lookupRepository.ResolveLookupCodeAsync(rule.OperatorId, cancellationToken);
 
-        // Evaluate the rule
-        var isBreached = rule.Evaluate(operatorCode, metric.Value);
+        // Evaluate the rule using the latest data point value
+        var isBreached = rule.Evaluate(operatorCode, latestData.Value);
 
         if (isBreached)
         {
-            signalState.RecordBreach(metric.Value);
+            signalState.RecordBreach(latestData.Value);
 
             // Check if we've reached the required consecutive breaches
             if (signalState.ConsecutiveBreaches >= rule.ConsecutiveBreachesRequired)
             {
-                await CreateSignalAsync(rule, metric, operatorCode, cancellationToken);
+                await CreateSignalAsync(rule, latestData.Value, operatorCode, cancellationToken);
                 signalState.Reset();
                 return true;
             }
         }
         else
         {
-            signalState.RecordSuccess(metric.Value);
+            signalState.RecordSuccess(latestData.Value);
         }
 
         await _signalStateRepository.UpdateAsync(signalState, cancellationToken);
@@ -163,7 +177,7 @@ public class EvaluateRulesCommandHandler : IRequestHandler<EvaluateRulesCommand,
 
     private async Task CreateSignalAsync(
         Rule rule, 
-        Metric metric, 
+        decimal metricValue, 
         string operatorCode, 
         CancellationToken cancellationToken)
     {
@@ -182,17 +196,17 @@ public class EvaluateRulesCommandHandler : IRequestHandler<EvaluateRulesCommand,
             rule.AssetId,
             openStatusId,
             $"[{severityCode}] {rule.Name}: Threshold breached",
-            metric.Value,
+            metricValue,
             rule.Threshold,
             DateTime.UtcNow,
-            $"Rule '{rule.Name}' triggered. Value: {metric.Value}, Threshold: {rule.Threshold}, Operator: {operatorCode}");
+            $"Rule '{rule.Name}' triggered. Value: {metricValue}, Threshold: {rule.Threshold}, Operator: {operatorCode}");
 
         await _signalRepository.AddAsync(signal, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken); // Save to get signal ID
 
         _logger.LogInformation(
             "Signal created for rule {RuleId}: Value={Value}, Threshold={Threshold}",
-            rule.Id, metric.Value, rule.Threshold);
+            rule.Id, metricValue, rule.Threshold);
 
         // Create and dispatch notification
         await CreateAndDispatchNotificationAsync(rule, signal, cancellationToken);

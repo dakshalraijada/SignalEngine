@@ -24,8 +24,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<Plan> Plans => Set<Plan>();
     public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<Metric> Metrics => Set<Metric>();
+    public DbSet<MetricData> MetricData => Set<MetricData>();
     public DbSet<Rule> Rules => Set<Rule>();
     public DbSet<Signal> Signals => Set<Signal>();
+    public DbSet<SignalResolution> SignalResolutions => Set<SignalResolution>();
     public DbSet<SignalState> SignalStates => Set<SignalState>();
     public DbSet<Notification> Notifications => Set<Notification>();
 
@@ -48,6 +50,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             entity.Property(e => e.FirstName).HasMaxLength(100);
             entity.Property(e => e.LastName).HasMaxLength(100);
             entity.HasIndex(e => e.TenantId);
+
+            // Foreign key to Tenants
+            entity.HasOne(e => e.Tenant)
+                .WithMany()
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<ApplicationRole>(entity =>

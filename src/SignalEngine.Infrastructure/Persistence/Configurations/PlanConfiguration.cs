@@ -47,5 +47,11 @@ public class PlanConfiguration : IEntityTypeConfiguration<Plan>
 
         builder.Property(e => e.CreatedAt)
             .IsRequired();
+
+        // Foreign key to LookupValues for PlanCode
+        builder.HasOne(e => e.PlanCode)
+            .WithMany()
+            .HasForeignKey(e => e.PlanCodeId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

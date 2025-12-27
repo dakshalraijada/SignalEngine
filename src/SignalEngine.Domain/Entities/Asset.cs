@@ -16,6 +16,10 @@ public class Asset : AuditableEntity, ITenantScoped
     public string? Metadata { get; private set; }
     public bool IsActive { get; private set; }
 
+    // Navigation properties
+    public LookupValue? AssetType { get; private set; }
+    public Tenant? Tenant { get; private set; }
+
     private readonly List<Metric> _metrics = new();
     public IReadOnlyCollection<Metric> Metrics => _metrics.AsReadOnly();
 

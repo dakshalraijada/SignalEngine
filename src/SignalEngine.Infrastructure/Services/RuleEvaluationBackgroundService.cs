@@ -117,16 +117,28 @@ public class RuleEvaluationBackgroundService : BackgroundService
     {
         try
         {
-            // Get latest metric
+            // Get metric definition
             var metric = await context.Metrics
                 .Where(m => m.AssetId == rule.AssetId && m.Name == rule.MetricName)
-                .OrderByDescending(m => m.Timestamp)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (metric == null)
             {
-                _logger.LogDebug("No metric found for rule {RuleId}, asset {AssetId}, metric {MetricName}",
+                _logger.LogDebug("No metric definition found for rule {RuleId}, asset {AssetId}, metric {MetricName}",
                     rule.Id, rule.AssetId, rule.MetricName);
+                return;
+            }
+
+            // Get latest metric data point
+            var latestData = await context.MetricData
+                .Where(md => md.MetricId == metric.Id)
+                .OrderByDescending(md => md.Timestamp)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (latestData == null)
+            {
+                _logger.LogDebug("No metric data found for rule {RuleId}, metric {MetricId}",
+                    rule.Id, metric.Id);
                 return;
             }
 
@@ -143,12 +155,12 @@ public class RuleEvaluationBackgroundService : BackgroundService
             // Get operator code
             var operatorCode = await lookupRepository.ResolveLookupCodeAsync(rule.OperatorId, cancellationToken);
 
-            // Evaluate rule
-            var isBreached = rule.Evaluate(operatorCode, metric.Value);
+            // Evaluate rule using the latest data value
+            var isBreached = rule.Evaluate(operatorCode, latestData.Value);
 
             if (isBreached)
             {
-                signalState.RecordBreach(metric.Value);
+                signalState.RecordBreach(latestData.Value);
 
                 if (signalState.ConsecutiveBreaches >= rule.ConsecutiveBreachesRequired)
                 {
@@ -164,10 +176,10 @@ public class RuleEvaluationBackgroundService : BackgroundService
                         rule.AssetId,
                         openStatusId,
                         $"[{severityCode}] {rule.Name}: Threshold breached",
-                        metric.Value,
+                        latestData.Value,
                         rule.Threshold,
                         DateTime.UtcNow,
-                        $"Rule '{rule.Name}' triggered. Value: {metric.Value}, Threshold: {rule.Threshold}, Operator: {operatorCode}");
+                        $"Rule '{rule.Name}' triggered. Value: {latestData.Value}, Threshold: {rule.Threshold}, Operator: {operatorCode}");
 
                     await context.Signals.AddAsync(signal, cancellationToken);
                     await context.SaveChangesAsync(cancellationToken); // Save to get signal ID
@@ -202,12 +214,12 @@ public class RuleEvaluationBackgroundService : BackgroundService
 
                     _logger.LogInformation(
                         "Signal created for rule {RuleId}: Value={Value}, Threshold={Threshold}",
-                        rule.Id, metric.Value, rule.Threshold);
+                        rule.Id, latestData.Value, rule.Threshold);
                 }
             }
             else
             {
-                signalState.RecordSuccess(metric.Value);
+                signalState.RecordSuccess(latestData.Value);
             }
         }
         catch (Exception ex)

@@ -3,7 +3,8 @@ using SignalEngine.Domain.Common;
 namespace SignalEngine.Domain.Entities;
 
 /// <summary>
-/// Represents a metric data point for an asset.
+/// Represents a metric definition for an asset.
+/// Actual time-series values are stored in MetricData (append-only).
 /// MetricTypeId references LookupValues (METRIC_TYPE: NUMERIC, PERCENTAGE, RATE).
 /// </summary>
 public class Metric : AuditableEntity, ITenantScoped
@@ -12,10 +13,16 @@ public class Metric : AuditableEntity, ITenantScoped
     public int AssetId { get; private set; }
     public string Name { get; private set; } = null!;
     public int MetricTypeId { get; private set; }
-    public decimal Value { get; private set; }
-    public DateTime Timestamp { get; private set; }
     public string? Unit { get; private set; }
     public string? Source { get; private set; }
+    public bool IsActive { get; private set; }
+
+    // Navigation properties
+    public LookupValue? MetricType { get; private set; }
+    public Asset? Asset { get; private set; }
+
+    private readonly List<MetricData> _dataPoints = new();
+    public IReadOnlyCollection<MetricData> DataPoints => _dataPoints.AsReadOnly();
 
     private Metric() { } // EF Core
 
@@ -24,8 +31,6 @@ public class Metric : AuditableEntity, ITenantScoped
         int assetId,
         string name,
         int metricTypeId,
-        decimal value,
-        DateTime timestamp,
         string? unit = null,
         string? source = null)
     {
@@ -45,15 +50,21 @@ public class Metric : AuditableEntity, ITenantScoped
         AssetId = assetId;
         Name = name;
         MetricTypeId = metricTypeId;
-        Value = value;
-        Timestamp = timestamp;
+        Unit = unit;
+        Source = source;
+        IsActive = true;
+    }
+
+    public void Update(string name, string? unit, string? source)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Metric name is required.", nameof(name));
+
+        Name = name;
         Unit = unit;
         Source = source;
     }
 
-    public void UpdateValue(decimal value, DateTime timestamp)
-    {
-        Value = value;
-        Timestamp = timestamp;
-    }
+    public void Activate() => IsActive = true;
+    public void Deactivate() => IsActive = false;
 }

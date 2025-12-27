@@ -22,6 +22,13 @@ public class Rule : AuditableEntity, ITenantScoped
     public int ConsecutiveBreachesRequired { get; private set; }
     public bool IsActive { get; private set; }
 
+    // Navigation properties
+    public LookupValue? Operator { get; private set; }
+    public LookupValue? Severity { get; private set; }
+    public LookupValue? EvaluationFrequency { get; private set; }
+    public Asset? Asset { get; private set; }
+    public Tenant? Tenant { get; private set; }
+
     private readonly List<Signal> _signals = new();
     public IReadOnlyCollection<Signal> Signals => _signals.AsReadOnly();
 

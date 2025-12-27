@@ -54,7 +54,9 @@ public static class DependencyInjection
         services.AddScoped<IRuleRepository, RuleRepository>();
         services.AddScoped<ISignalRepository, SignalRepository>();
         services.AddScoped<ISignalStateRepository, SignalStateRepository>();
+        services.AddScoped<ISignalResolutionRepository, SignalResolutionRepository>();
         services.AddScoped<IMetricRepository, MetricRepository>();
+        services.AddScoped<IMetricDataRepository, MetricDataRepository>();
         services.AddScoped<IAssetRepository, AssetRepository>();
         services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<IPlanRepository, PlanRepository>();

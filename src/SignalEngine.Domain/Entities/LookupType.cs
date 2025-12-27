@@ -6,7 +6,7 @@ namespace SignalEngine.Domain.Entities;
 /// Represents a lookup type category (e.g., TENANT_TYPE, PLAN_CODE).
 /// This is the parent table for lookup values.
 /// </summary>
-public class LookupType : Entity
+public class LookupType : AuditableEntity
 {
     public string Code { get; private set; } = null!;
     public string Description { get; private set; } = null!;

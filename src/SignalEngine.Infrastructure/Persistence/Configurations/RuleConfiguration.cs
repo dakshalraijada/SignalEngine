@@ -61,8 +61,24 @@ public class RuleConfiguration : IEntityTypeConfiguration<Rule>
         builder.HasIndex(e => e.EvaluationFrequencyId);
         builder.HasIndex(e => e.IsActive);
 
+        // Foreign keys to LookupValues
+        builder.HasOne(e => e.Operator)
+            .WithMany()
+            .HasForeignKey(e => e.OperatorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(e => e.Severity)
+            .WithMany()
+            .HasForeignKey(e => e.SeverityId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(e => e.EvaluationFrequency)
+            .WithMany()
+            .HasForeignKey(e => e.EvaluationFrequencyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasMany(e => e.Signals)
-            .WithOne()
+            .WithOne(s => s.Rule)
             .HasForeignKey(e => e.RuleId)
             .OnDelete(DeleteBehavior.Restrict);
     }

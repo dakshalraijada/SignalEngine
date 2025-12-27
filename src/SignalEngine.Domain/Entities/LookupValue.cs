@@ -6,13 +6,16 @@ namespace SignalEngine.Domain.Entities;
 /// Represents a lookup value (e.g., B2C, B2B for TENANT_TYPE).
 /// All enum-like concepts are stored as lookup values.
 /// </summary>
-public class LookupValue : Entity
+public class LookupValue : AuditableEntity
 {
     public int LookupTypeId { get; private set; }
     public string Code { get; private set; } = null!;
     public string Name { get; private set; } = null!;
     public int SortOrder { get; private set; }
     public bool IsActive { get; private set; }
+
+    // Navigation property
+    public LookupType? LookupType { get; private set; }
 
     private LookupValue() { } // EF Core
 

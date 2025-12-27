@@ -33,6 +33,9 @@ public class LookupValueConfiguration : IEntityTypeConfiguration<LookupValue>
             .IsRequired()
             .HasDefaultValue(true);
 
+        builder.Property(e => e.CreatedAt)
+            .IsRequired();
+
         builder.HasIndex(e => new { e.LookupTypeId, e.Code })
             .IsUnique();
     }

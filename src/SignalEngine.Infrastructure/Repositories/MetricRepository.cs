@@ -6,7 +6,7 @@ using SignalEngine.Infrastructure.Persistence;
 namespace SignalEngine.Infrastructure.Repositories;
 
 /// <summary>
-/// Repository implementation for Metric operations.
+/// Repository implementation for Metric (definition) operations.
 /// </summary>
 public class MetricRepository : IMetricRepository
 {
@@ -22,20 +22,19 @@ public class MetricRepository : IMetricRepository
         return await _context.Metrics.FindAsync([id], cancellationToken);
     }
 
+    public async Task<Metric?> GetByAssetAndNameAsync(int assetId, string metricName, CancellationToken cancellationToken = default)
+    {
+        return await _context.Metrics
+            .Where(x => x.AssetId == assetId && x.Name == metricName)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Metric>> GetByAssetIdAsync(int assetId, CancellationToken cancellationToken = default)
     {
         return await _context.Metrics
             .Where(x => x.AssetId == assetId)
-            .OrderByDescending(x => x.Timestamp)
+            .OrderBy(x => x.Name)
             .ToListAsync(cancellationToken);
-    }
-
-    public async Task<Metric?> GetLatestByAssetAndNameAsync(int assetId, string metricName, CancellationToken cancellationToken = default)
-    {
-        return await _context.Metrics
-            .Where(x => x.AssetId == assetId && x.Name == metricName)
-            .OrderByDescending(x => x.Timestamp)
-            .FirstOrDefaultAsync(cancellationToken);
     }
 
     public async Task<Metric> AddAsync(Metric metric, CancellationToken cancellationToken = default)

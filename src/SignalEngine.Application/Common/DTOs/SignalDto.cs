@@ -1,7 +1,7 @@
 namespace SignalEngine.Application.Common.DTOs;
 
 /// <summary>
-/// DTO for Signal entity.
+/// DTO for Signal entity with optional resolution details.
 /// </summary>
 public record SignalDto(
     int Id,
@@ -14,5 +14,13 @@ public record SignalDto(
     decimal TriggerValue,
     decimal ThresholdValue,
     DateTime TriggeredAt,
-    DateTime? ResolvedAt,
-    string? ResolutionNotes);
+    SignalResolutionDto? Resolution);
+
+/// <summary>
+/// DTO for SignalResolution entity.
+/// </summary>
+public record SignalResolutionDto(
+    int Id,
+    DateTime ResolvedAt,
+    int ResolvedByUserId,
+    string? Notes);

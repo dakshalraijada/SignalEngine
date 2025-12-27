@@ -8,10 +8,12 @@ namespace SignalEngine.Application.Metrics.Commands;
 
 /// <summary>
 /// Handler for IngestMetricCommand.
+/// Creates or finds metric definition and adds time-series data point.
 /// </summary>
 public class IngestMetricCommandHandler : IRequestHandler<IngestMetricCommand, int>
 {
     private readonly IMetricRepository _metricRepository;
+    private readonly IMetricDataRepository _metricDataRepository;
     private readonly IAssetRepository _assetRepository;
     private readonly ILookupRepository _lookupRepository;
     private readonly ICurrentUserService _currentUserService;
@@ -19,12 +21,14 @@ public class IngestMetricCommandHandler : IRequestHandler<IngestMetricCommand, i
 
     public IngestMetricCommandHandler(
         IMetricRepository metricRepository,
+        IMetricDataRepository metricDataRepository,
         IAssetRepository assetRepository,
         ILookupRepository lookupRepository,
         ICurrentUserService currentUserService,
         IUnitOfWork unitOfWork)
     {
         _metricRepository = metricRepository;
+        _metricDataRepository = metricDataRepository;
         _assetRepository = assetRepository;
         _lookupRepository = lookupRepository;
         _currentUserService = currentUserService;
@@ -47,20 +51,33 @@ public class IngestMetricCommandHandler : IRequestHandler<IngestMetricCommand, i
         var metricTypeId = await _lookupRepository.ResolveLookupIdAsync(
             LookupTypeCodes.MetricType, request.MetricTypeCode, cancellationToken);
 
-        // Create metric
-        var metric = new Metric(
-            tenantId,
-            request.AssetId,
-            request.Name,
-            metricTypeId,
-            request.Value,
-            request.Timestamp ?? DateTime.UtcNow,
-            request.Unit,
-            request.Source);
+        // Find or create metric definition
+        var metric = await _metricRepository.GetByAssetAndNameAsync(request.AssetId, request.Name, cancellationToken);
+        
+        if (metric == null)
+        {
+            metric = new Metric(
+                tenantId,
+                request.AssetId,
+                request.Name,
+                metricTypeId,
+                request.Unit,
+                request.Source);
 
-        await _metricRepository.AddAsync(metric, cancellationToken);
+            await _metricRepository.AddAsync(metric, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken); // Save to get metric ID
+        }
+
+        // Create metric data point (append-only time-series)
+        var metricData = new MetricData(
+            tenantId,
+            metric.Id,
+            request.Value,
+            request.Timestamp ?? DateTime.UtcNow);
+
+        await _metricDataRepository.AddAsync(metricData, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return metric.Id;
+        return metricData.Id;
     }
 }

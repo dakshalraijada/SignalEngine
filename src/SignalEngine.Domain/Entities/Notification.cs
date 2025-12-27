@@ -19,6 +19,10 @@ public class Notification : AuditableEntity, ITenantScoped
     public string? ErrorMessage { get; private set; }
     public int RetryCount { get; private set; }
 
+    // Navigation properties
+    public LookupValue? ChannelType { get; private set; }
+    public Signal? Signal { get; private set; }
+
     private Notification() { } // EF Core
 
     public Notification(
