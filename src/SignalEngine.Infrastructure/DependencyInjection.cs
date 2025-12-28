@@ -70,7 +70,21 @@ public static class DependencyInjection
         services.AddScoped<ITenantAccessor, TenantAccessor>();
 
         // Register services
+        
+        // Register HttpClient for NotificationDispatcher (webhook HTTP POST)
+        services.AddHttpClient<NotificationDispatcher>(client =>
+        {
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
         services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
+        
+        // Register HttpClient for Binance API
+        services.AddHttpClient<BinanceDataSourceProvider>(client =>
+        {
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
         
         // Register data source providers for metric ingestion
         services.AddScoped<IDataSourceProvider, BinanceDataSourceProvider>();
