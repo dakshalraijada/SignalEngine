@@ -63,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<IPlanRepository, PlanRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IIngestionRepository, IngestionRepository>();
+        services.AddScoped<IRuleEvaluationRepository, RuleEvaluationRepository>();
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ApplicationDbContext>());
 
         // Register tenant accessor for multi-tenant query filtering

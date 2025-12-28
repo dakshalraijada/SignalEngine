@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using SignalEngine.Application.Common.Interfaces;
@@ -8,248 +9,297 @@ namespace SignalEngine.Application.Rules.Commands;
 
 /// <summary>
 /// Handler for evaluating all active rules and generating signals when thresholds are breached.
+/// 
+/// === RESPONSIBILITY BOUNDARIES ===
+/// 
+/// ✅ MUST DO:
+/// - Read MetricData (latest value per metric)
+/// - Evaluate active Rules against threshold
+/// - Update SignalState (consecutive breaches tracking)
+/// - Append Signals when conditions are met
+/// 
+/// ❌ MUST NOT:
+/// - Ingest data (MetricIngestionWorker responsibility)
+/// - Deliver notifications (NotificationWorker responsibility - future)
+/// - Call SystemApi HTTP endpoints (direct DB access only)
+/// - Mutate existing Signals (immutable after creation)
+/// - Bypass CQRS patterns
+/// 
+/// === EVALUATION SEMANTICS ===
+/// 
+/// 1. MetricData Selection:
+///    - Uses LATEST value only (most recent by Timestamp)
+///    - Time-windowed aggregation NOT implemented (future work)
+/// 
+/// 2. Operators (Rule.Evaluate):
+///    - GT:  metricValue > Threshold
+///    - GTE: metricValue >= Threshold
+///    - LT:  metricValue &lt; Threshold
+///    - LTE: metricValue &lt;= Threshold
+///    - EQ:  metricValue == Threshold
+/// 
+/// 3. ConsecutiveBreachesRequired:
+///    - Increment on breach → SignalState.RecordBreach()
+///    - Reset on non-breach → SignalState.RecordSuccess()
+///    - Trigger Signal ONLY when ConsecutiveBreaches >= ConsecutiveBreachesRequired
+/// 
+/// 4. Signal Creation:
+///    - ONE Signal per breach cycle (when threshold reached)
+///    - Signal is IMMUTABLE after creation
+///    - Severity derived from Rule.SeverityId
+///    - SignalState.Reset() called after signal creation
+/// 
+/// 5. SignalState Lifecycle:
+///    - One row per Rule (1:1 relationship)
+///    - Tracks: IsBreached, ConsecutiveBreaches, LastEvaluatedAt, LastMetricValue
+///    - GetOrCreate pattern (auto-creates if missing)
+///    - Resets after signal creation to start fresh breach cycle
+/// 
+/// === TRANSACTION BOUNDARIES ===
+/// 
+/// All changes within a single evaluation cycle are persisted in ONE transaction:
+/// - SignalState updates
+/// - Signal additions
+/// 
+/// If any rule fails, it's logged and skipped; other rules continue.
+/// Final SaveChanges commits all successful evaluations atomically.
+/// 
+/// === FAILURE HANDLING ===
+/// 
+/// - Missing MetricData: Rule skipped (not an error)
+/// - Individual rule evaluation failure: Logged, rule skipped, others continue
+/// - Transaction failure: All changes rolled back, no partial state
+/// - Safe to retry: SignalState prevents duplicate signals
 /// </summary>
 public class EvaluateRulesCommandHandler : IRequestHandler<EvaluateRulesCommand, EvaluateRulesResult>
 {
-    private readonly IRuleRepository _ruleRepository;
-    private readonly IMetricRepository _metricRepository;
-    private readonly IMetricDataRepository _metricDataRepository;
-    private readonly ISignalRepository _signalRepository;
-    private readonly ISignalStateRepository _signalStateRepository;
-    private readonly ILookupRepository _lookupRepository;
-    private readonly INotificationDispatcher _notificationDispatcher;
-    private readonly INotificationRepository _notificationRepository;
+    private readonly IRuleEvaluationRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<EvaluateRulesCommandHandler> _logger;
 
     public EvaluateRulesCommandHandler(
-        IRuleRepository ruleRepository,
-        IMetricRepository metricRepository,
-        IMetricDataRepository metricDataRepository,
-        ISignalRepository signalRepository,
-        ISignalStateRepository signalStateRepository,
-        ILookupRepository lookupRepository,
-        INotificationDispatcher notificationDispatcher,
-        INotificationRepository notificationRepository,
+        IRuleEvaluationRepository repository,
         IUnitOfWork unitOfWork,
         ILogger<EvaluateRulesCommandHandler> logger)
     {
-        _ruleRepository = ruleRepository;
-        _metricRepository = metricRepository;
-        _metricDataRepository = metricDataRepository;
-        _signalRepository = signalRepository;
-        _signalStateRepository = signalStateRepository;
-        _lookupRepository = lookupRepository;
-        _notificationDispatcher = notificationDispatcher;
-        _notificationRepository = notificationRepository;
+        _repository = repository;
         _unitOfWork = unitOfWork;
         _logger = logger;
     }
 
-    public async Task<EvaluateRulesResult> Handle(EvaluateRulesCommand request, CancellationToken cancellationToken)
+    public async Task<EvaluateRulesResult> Handle(
+        EvaluateRulesCommand request,
+        CancellationToken cancellationToken)
     {
+        var stopwatch = Stopwatch.StartNew();
         var rulesEvaluated = 0;
         var signalsCreated = 0;
+        var rulesSkipped = 0;
         var errors = 0;
 
         try
         {
-            // Get rules to evaluate based on request parameters
-            var rules = await GetRulesToEvaluateAsync(request, cancellationToken);
-            
-            _logger.LogInformation("Starting rule evaluation for {Count} rules", rules.Count);
+            // Step 1: Load all active rules with dependencies
+            var rules = await _repository.GetActiveRulesWithDependenciesAsync(cancellationToken);
 
+            if (rules.Count == 0)
+            {
+                _logger.LogDebug("No active rules found for evaluation");
+                return EvaluateRulesResult.Empty(stopwatch.Elapsed);
+            }
+
+            _logger.LogInformation("Starting rule evaluation for {Count} active rules", rules.Count);
+
+            // Pre-fetch the OPEN signal status ID (used for all signals in this cycle)
+            var openStatusId = await _repository.ResolveLookupIdAsync(
+                LookupTypeCodes.SignalStatus,
+                SignalStatusCodes.Open,
+                cancellationToken);
+
+            // Step 2: Evaluate each rule
             foreach (var rule in rules)
             {
                 try
                 {
-                    var signalCreated = await EvaluateRuleAsync(rule, cancellationToken);
-                    rulesEvaluated++;
-                    if (signalCreated) signalsCreated++;
+                    var result = await EvaluateRuleAsync(rule, openStatusId, cancellationToken);
+                    
+                    switch (result)
+                    {
+                        case RuleEvaluationOutcome.Evaluated:
+                            rulesEvaluated++;
+                            break;
+                        case RuleEvaluationOutcome.SignalCreated:
+                            rulesEvaluated++;
+                            signalsCreated++;
+                            break;
+                        case RuleEvaluationOutcome.SkippedNoData:
+                            rulesSkipped++;
+                            break;
+                    }
                 }
                 catch (Exception ex)
                 {
                     errors++;
-                    _logger.LogError(ex, "Error evaluating rule {RuleId}: {RuleName}", rule.Id, rule.Name);
+                    _logger.LogError(ex,
+                        "Error evaluating rule {RuleId} ({RuleName}) for tenant {TenantId}",
+                        rule.Id, rule.Name, rule.TenantId);
+                    // Continue with other rules - don't let one failure stop the cycle
                 }
             }
 
-            // Save all changes at once
+            // Step 3: Persist all changes in a single transaction
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+            stopwatch.Stop();
+
             _logger.LogInformation(
-                "Rule evaluation completed. Rules: {RulesEvaluated}, Signals: {SignalsCreated}, Errors: {Errors}",
-                rulesEvaluated, signalsCreated, errors);
+                "Rule evaluation completed. Evaluated: {Evaluated}, Signals: {Signals}, Skipped: {Skipped}, Errors: {Errors}, Duration: {Duration}ms",
+                rulesEvaluated, signalsCreated, rulesSkipped, errors, stopwatch.ElapsedMilliseconds);
+
+            return new EvaluateRulesResult(rulesEvaluated, signalsCreated, rulesSkipped, errors, stopwatch.Elapsed);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fatal error during rule evaluation");
             throw;
         }
-
-        return new EvaluateRulesResult(rulesEvaluated, signalsCreated, errors);
     }
 
-    private async Task<IReadOnlyList<Rule>> GetRulesToEvaluateAsync(
-        EvaluateRulesCommand request, 
+    /// <summary>
+    /// Evaluates a single rule against its latest metric data.
+    /// </summary>
+    private async Task<RuleEvaluationOutcome> EvaluateRuleAsync(
+        Rule rule,
+        int openStatusId,
         CancellationToken cancellationToken)
     {
-        // If specific frequency is provided, get rules for that frequency
-        if (!string.IsNullOrEmpty(request.EvaluationFrequencyCode))
-        {
-            var frequencyId = await _lookupRepository.ResolveLookupIdAsync(
-                LookupTypeCodes.RuleEvaluationFrequency, 
-                request.EvaluationFrequencyCode, 
-                cancellationToken);
-            
-            return await _ruleRepository.GetByEvaluationFrequencyIdAsync(frequencyId, cancellationToken);
-        }
-
-        // If specific tenant is provided, get active rules for that tenant
-        if (request.TenantId.HasValue)
-        {
-            return await _ruleRepository.GetActiveByTenantIdAsync(request.TenantId.Value, cancellationToken);
-        }
-
-        // Otherwise, get all active rules
-        return await _ruleRepository.GetAllActiveAsync(cancellationToken);
-    }
-
-    private async Task<bool> EvaluateRuleAsync(Rule rule, CancellationToken cancellationToken)
-    {
-        // Get metric definition for this rule
-        var metric = await _metricRepository.GetByAssetAndNameAsync(
-            rule.AssetId, 
-            rule.MetricName, 
+        // Step 1: Get latest metric data for this rule
+        var latestData = await _repository.GetLatestMetricValueAsync(
+            rule.AssetId,
+            rule.MetricName,
             cancellationToken);
-
-        if (metric == null)
-        {
-            _logger.LogDebug(
-                "No metric definition found for rule {RuleId}, asset {AssetId}, metric {MetricName}",
-                rule.Id, rule.AssetId, rule.MetricName);
-            return false;
-        }
-
-        // Get the latest data point for this metric
-        var latestData = await _metricDataRepository.GetLatestByMetricIdAsync(metric.Id, cancellationToken);
 
         if (latestData == null)
         {
             _logger.LogDebug(
-                "No metric data found for rule {RuleId}, metric {MetricId}",
-                rule.Id, metric.Id);
-            return false;
+                "Rule {RuleId} skipped: No metric data for asset {AssetId}, metric '{MetricName}'",
+                rule.Id, rule.AssetId, rule.MetricName);
+            return RuleEvaluationOutcome.SkippedNoData;
         }
 
-        // Get or create signal state for tracking consecutive breaches
-        var signalState = await _signalStateRepository.GetOrCreateAsync(
-            rule.TenantId, 
-            rule.Id, 
+        // Step 2: Get or create SignalState for tracking breaches
+        var signalState = await _repository.GetOrCreateSignalStateAsync(
+            rule.TenantId,
+            rule.Id,
             cancellationToken);
 
-        // Get operator code for evaluation
-        var operatorCode = await _lookupRepository.ResolveLookupCodeAsync(rule.OperatorId, cancellationToken);
+        // Step 3: Resolve operator code (already loaded via Include, but safeguard)
+        var operatorCode = rule.Operator?.Code
+            ?? await _repository.ResolveLookupCodeAsync(rule.OperatorId, cancellationToken);
 
-        // Evaluate the rule using the latest data point value
+        // Step 4: Evaluate the rule condition
         var isBreached = rule.Evaluate(operatorCode, latestData.Value);
+
+        _logger.LogDebug(
+            "Rule {RuleId} evaluated: Value={Value}, Threshold={Threshold}, Operator={Op}, Breached={Breached}",
+            rule.Id, latestData.Value, rule.Threshold, operatorCode, isBreached);
 
         if (isBreached)
         {
+            // Record breach - increments consecutive counter
             signalState.RecordBreach(latestData.Value);
 
-            // Check if we've reached the required consecutive breaches
+            _logger.LogDebug(
+                "Rule {RuleId} breach recorded. Consecutive: {Count}/{Required}",
+                rule.Id, signalState.ConsecutiveBreaches, rule.ConsecutiveBreachesRequired);
+
+            // Check if we've reached the threshold for signal creation
             if (signalState.ConsecutiveBreaches >= rule.ConsecutiveBreachesRequired)
             {
-                await CreateSignalAsync(rule, latestData.Value, operatorCode, cancellationToken);
+                await CreateSignalAsync(rule, latestData.Value, operatorCode, openStatusId, cancellationToken);
+                
+                // Reset state to start new breach cycle
                 signalState.Reset();
-                return true;
+                
+                return RuleEvaluationOutcome.SignalCreated;
             }
         }
         else
         {
+            // No breach - reset consecutive counter
             signalState.RecordSuccess(latestData.Value);
+            
+            _logger.LogDebug(
+                "Rule {RuleId} condition not breached. Consecutive breaches reset to 0",
+                rule.Id);
         }
 
-        await _signalStateRepository.UpdateAsync(signalState, cancellationToken);
-        return false;
+        // SignalState is tracked by DbContext, changes will be persisted on SaveChanges
+        return RuleEvaluationOutcome.Evaluated;
     }
 
+    /// <summary>
+    /// Creates a new signal for a breached rule.
+    /// Signals are immutable after creation.
+    /// </summary>
     private async Task CreateSignalAsync(
-        Rule rule, 
-        decimal metricValue, 
-        string operatorCode, 
+        Rule rule,
+        decimal metricValue,
+        string operatorCode,
+        int openStatusId,
         CancellationToken cancellationToken)
     {
-        // Get lookup values for signal creation
-        var openStatusId = await _lookupRepository.ResolveLookupIdAsync(
-            LookupTypeCodes.SignalStatus, 
-            SignalStatusCodes.Open, 
-            cancellationToken);
+        var severityCode = rule.Severity?.Code
+            ?? await _repository.ResolveLookupCodeAsync(rule.SeverityId, cancellationToken);
 
-        var severityCode = await _lookupRepository.ResolveLookupCodeAsync(rule.SeverityId, cancellationToken);
-
-        // Create the signal
         var signal = new Signal(
-            rule.TenantId,
-            rule.Id,
-            rule.AssetId,
-            openStatusId,
-            $"[{severityCode}] {rule.Name}: Threshold breached",
-            metricValue,
-            rule.Threshold,
-            DateTime.UtcNow,
-            $"Rule '{rule.Name}' triggered. Value: {metricValue}, Threshold: {rule.Threshold}, Operator: {operatorCode}");
+            tenantId: rule.TenantId,
+            ruleId: rule.Id,
+            assetId: rule.AssetId,
+            signalStatusId: openStatusId,
+            title: $"[{severityCode}] {rule.Name}: Threshold breached",
+            triggerValue: metricValue,
+            thresholdValue: rule.Threshold,
+            triggeredAt: DateTime.UtcNow,
+            description: BuildSignalDescription(rule, metricValue, operatorCode));
 
-        await _signalRepository.AddAsync(signal, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken); // Save to get signal ID
+        await _repository.AddSignalAsync(signal, cancellationToken);
 
         _logger.LogInformation(
-            "Signal created for rule {RuleId}: Value={Value}, Threshold={Threshold}",
-            rule.Id, metricValue, rule.Threshold);
-
-        // Create and dispatch notification
-        await CreateAndDispatchNotificationAsync(rule, signal, cancellationToken);
+            "Signal created for rule {RuleId} ({RuleName}): Value={Value}, Threshold={Threshold}, Severity={Severity}",
+            rule.Id, rule.Name, metricValue, rule.Threshold, severityCode);
     }
 
-    private async Task CreateAndDispatchNotificationAsync(
-        Rule rule, 
-        Signal signal, 
-        CancellationToken cancellationToken)
+    /// <summary>
+    /// Builds a human-readable description for the signal.
+    /// </summary>
+    private static string BuildSignalDescription(Rule rule, decimal metricValue, string operatorCode)
     {
-        try
+        var opDescription = operatorCode switch
         {
-            var emailChannelId = await _lookupRepository.ResolveLookupIdAsync(
-                LookupTypeCodes.NotificationChannelType, 
-                NotificationChannelTypeCodes.Email, 
-                cancellationToken);
+            "GT" => "exceeded",
+            "GTE" => "met or exceeded",
+            "LT" => "fell below",
+            "LTE" => "met or fell below",
+            "EQ" => "equaled",
+            _ => "breached"
+        };
 
-            var notification = new Notification(
-                rule.TenantId,
-                signal.Id,
-                emailChannelId,
-                "admin@signalengine.local", // TODO: Get from tenant settings
-                signal.Title,
-                signal.Description ?? signal.Title);
+        return $"Rule '{rule.Name}' triggered: Metric '{rule.MetricName}' value ({metricValue}) {opDescription} threshold ({rule.Threshold}).";
+    }
 
-            await _notificationRepository.AddAsync(notification, cancellationToken);
-
-            // Dispatch notification
-            var sent = await _notificationDispatcher.DispatchAsync(notification, cancellationToken);
-            if (sent)
-            {
-                notification.MarkAsSent();
-            }
-            else
-            {
-                notification.MarkAsFailed("Failed to send notification");
-            }
-
-            await _notificationRepository.UpdateAsync(notification, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to create/dispatch notification for signal {SignalId}", signal.Id);
-        }
+    /// <summary>
+    /// Outcome of evaluating a single rule.
+    /// </summary>
+    private enum RuleEvaluationOutcome
+    {
+        /// <summary>Rule evaluated, no signal created.</summary>
+        Evaluated,
+        
+        /// <summary>Rule evaluated, signal created.</summary>
+        SignalCreated,
+        
+        /// <summary>Rule skipped due to missing metric data.</summary>
+        SkippedNoData
     }
 }
