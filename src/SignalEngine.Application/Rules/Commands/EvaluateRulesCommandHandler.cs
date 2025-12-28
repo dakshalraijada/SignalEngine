@@ -280,21 +280,33 @@ public class EvaluateRulesCommandHandler : IRequestHandler<EvaluateRulesCommand,
         // Save to get the signal ID for notification
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        // Queue notification for dispatch by NotificationWorker
+        // Queue email notification for dispatch by NotificationWorker
         // QUEUE-ONLY: This persists to DB but NEVER dispatches
-        var notification = new Notification(
-            tenantId: rule.TenantId,
-            signalId: signal.Id,
-            channelTypeId: emailChannelId,
-            recipient: "admin@signalengine.local", // TODO: Get from tenant/rule configuration
-            subject: signal.Title,
-            body: signal.Description ?? signal.Title);
+        // Recipient is resolved from Tenant.DefaultNotificationEmail
+        var recipientEmail = rule.Tenant?.DefaultNotificationEmail;
+        
+        if (string.IsNullOrWhiteSpace(recipientEmail))
+        {
+            _logger.LogWarning(
+                "No DefaultNotificationEmail configured for tenant {TenantId}. Email notification skipped for signal {SignalId}.",
+                rule.TenantId, signal.Id);
+        }
+        else
+        {
+            var notification = new Notification(
+                tenantId: rule.TenantId,
+                signalId: signal.Id,
+                channelTypeId: emailChannelId,
+                recipient: recipientEmail,
+                subject: signal.Title,
+                body: signal.Description ?? signal.Title);
 
-        await _repository.AddNotificationAsync(notification, cancellationToken);
-
-        _logger.LogInformation(
-            "Signal created for rule {RuleId} ({RuleName}): Value={Value}, Threshold={Threshold}, Severity={Severity}. Notification queued.",
-            rule.Id, rule.Name, metricValue, rule.Threshold, severityCode);
+            await _repository.AddNotificationAsync(notification, cancellationToken);
+            
+            _logger.LogInformation(
+                "Signal created for rule {RuleId} ({RuleName}): Value={Value}, Threshold={Threshold}, Severity={Severity}. Notification queued to {Recipient}.",
+                rule.Id, rule.Name, metricValue, rule.Threshold, severityCode, recipientEmail);
+        }
     }
 
     /// <summary>

@@ -80,7 +80,7 @@ public class EvaluateRulesCommandHandlerTests
     public async Task Handle_BreachMeetsThreshold_CreatesSignalAndQueuesNotification()
     {
         // Arrange
-        var rule = CreateTestRule(threshold: 100, consecutiveBreachesRequired: 1);
+        var rule = CreateTestRule(threshold: 100, consecutiveBreachesRequired: 1, tenantNotificationEmail: "tenant@test.com");
         var metric = CreateTestMetric();
         var metricData = CreateTestMetricData(metric, value: 150m); // Above threshold
         var signalState = CreateTestSignalState(rule);
@@ -106,6 +106,82 @@ public class EvaluateRulesCommandHandlerTests
         capturedNotification!.TenantId.Should().Be(rule.TenantId);
         capturedNotification.IsSent.Should().BeFalse(); // NOT sent - just queued
         capturedNotification.RetryCount.Should().Be(0);
+        
+        // NEW: Verify recipient is from tenant configuration
+        capturedNotification.Recipient.Should().Be("tenant@test.com");
+    }
+
+    [Fact]
+    public async Task Handle_TenantWithDefaultNotificationEmail_QueuesNotificationWithTenantEmail()
+    {
+        // Arrange - Tenant has email configured
+        var rule = CreateTestRule(threshold: 100, consecutiveBreachesRequired: 1, tenantNotificationEmail: "alerts@mytenant.com");
+        var metric = CreateTestMetric();
+        var metricData = CreateTestMetricData(metric, value: 150m); // Above threshold - will breach
+        var signalState = CreateTestSignalState(rule);
+
+        SetupRepositoryForBreachScenario(rule, metricData, signalState);
+
+        Notification? capturedNotification = null;
+        _repositoryMock.Setup(r => r.AddNotificationAsync(It.IsAny<Notification>(), It.IsAny<CancellationToken>()))
+            .Callback<Notification, CancellationToken>((n, _) => capturedNotification = n)
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _handler.Handle(new EvaluateRulesCommand(), CancellationToken.None);
+
+        // Assert
+        result.SignalsCreated.Should().Be(1);
+        
+        // Notification should be queued with tenant's email
+        _repositoryMock.Verify(r => r.AddNotificationAsync(It.IsAny<Notification>(), It.IsAny<CancellationToken>()), Times.Once);
+        capturedNotification.Should().NotBeNull();
+        capturedNotification!.Recipient.Should().Be("alerts@mytenant.com");
+    }
+
+    [Fact]
+    public async Task Handle_TenantWithoutDefaultNotificationEmail_DoesNotQueueNotification_SignalStillCreated()
+    {
+        // Arrange - Tenant has NO email configured (null)
+        var rule = CreateTestRule(threshold: 100, consecutiveBreachesRequired: 1, tenantNotificationEmail: null);
+        var metric = CreateTestMetric();
+        var metricData = CreateTestMetricData(metric, value: 150m); // Above threshold - will breach
+        var signalState = CreateTestSignalState(rule);
+
+        SetupRepositoryForBreachScenario(rule, metricData, signalState);
+
+        // Act
+        var result = await _handler.Handle(new EvaluateRulesCommand(), CancellationToken.None);
+
+        // Assert
+        // Signal should still be created
+        result.SignalsCreated.Should().Be(1);
+        _repositoryMock.Verify(r => r.AddSignalAsync(It.IsAny<Signal>(), It.IsAny<CancellationToken>()), Times.Once);
+        
+        // CRITICAL: No notification should be queued when tenant has no email
+        _repositoryMock.Verify(r => r.AddNotificationAsync(It.IsAny<Notification>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_TenantWithEmptyNotificationEmail_DoesNotQueueNotification()
+    {
+        // Arrange - Tenant has empty string email
+        var rule = CreateTestRule(threshold: 100, consecutiveBreachesRequired: 1, tenantNotificationEmail: "   ");
+        var metric = CreateTestMetric();
+        var metricData = CreateTestMetricData(metric, value: 150m); // Above threshold - will breach
+        var signalState = CreateTestSignalState(rule);
+
+        SetupRepositoryForBreachScenario(rule, metricData, signalState);
+
+        // Act
+        var result = await _handler.Handle(new EvaluateRulesCommand(), CancellationToken.None);
+
+        // Assert
+        // Signal should still be created
+        result.SignalsCreated.Should().Be(1);
+        
+        // No notification should be queued when tenant has empty email
+        _repositoryMock.Verify(r => r.AddNotificationAsync(It.IsAny<Notification>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -155,7 +231,7 @@ public class EvaluateRulesCommandHandlerTests
     public async Task Handle_SignalCreated_SavesBeforeNotificationForForeignKey()
     {
         // Arrange
-        var rule = CreateTestRule(threshold: 100, consecutiveBreachesRequired: 1);
+        var rule = CreateTestRule(threshold: 100, consecutiveBreachesRequired: 1, tenantNotificationEmail: "tenant@test.com");
         var metric = CreateTestMetric();
         var metricData = CreateTestMetricData(metric, value: 150m);
         var signalState = CreateTestSignalState(rule);
@@ -218,11 +294,19 @@ public class EvaluateRulesCommandHandlerTests
 
     #region Helper Methods
 
-    private static Rule CreateTestRule(decimal threshold = 100m, int consecutiveBreachesRequired = 1)
+    private static Rule CreateTestRule(decimal threshold = 100m, int consecutiveBreachesRequired = 1, string? tenantNotificationEmail = "tenant@test.com")
     {
         // Create lookup values with valid constructor
         var operatorLookup = new LookupValue(1, "GT", "Greater Than");
         var severityLookup = new LookupValue(2, "HIGH", "High Severity");
+
+        // Create tenant with notification email
+        var tenant = (Tenant)Activator.CreateInstance(typeof(Tenant), true)!;
+        SetEntityId(tenant, 1);
+        SetPrivateProperty(tenant, "Name", "Test Tenant");
+        SetPrivateProperty(tenant, "Subdomain", "test");
+        SetPrivateProperty(tenant, "IsActive", true);
+        SetPrivateProperty(tenant, "DefaultNotificationEmail", tenantNotificationEmail);
 
         // Use the actual constructor
         var rule = new Rule(
@@ -240,6 +324,7 @@ public class EvaluateRulesCommandHandlerTests
         // Set navigation properties via reflection (they're set by EF Core normally)
         SetPrivateProperty(rule, "Operator", operatorLookup);
         SetPrivateProperty(rule, "Severity", severityLookup);
+        SetPrivateProperty(rule, "Tenant", tenant);
         
         // Set Id via base class
         SetEntityId(rule, 1);

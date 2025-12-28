@@ -34,6 +34,7 @@ public class RuleEvaluationRepository : IRuleEvaluationRepository
             .Include(r => r.Operator)
             .Include(r => r.Severity)
             .Include(r => r.Asset)
+            .Include(r => r.Tenant)
             .Where(r => r.IsActive)
             .AsNoTracking() // Rules are read-only in evaluation context
             .ToListAsync(cancellationToken);

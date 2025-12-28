@@ -33,6 +33,10 @@ public class TenantConfiguration : IEntityTypeConfiguration<Tenant>
             .IsRequired()
             .HasDefaultValue(true);
 
+        builder.Property(e => e.DefaultNotificationEmail)
+            .HasMaxLength(256)
+            .IsRequired(false);
+
         builder.Property(e => e.CreatedAt)
             .IsRequired();
 

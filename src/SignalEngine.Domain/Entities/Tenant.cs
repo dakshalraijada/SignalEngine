@@ -13,6 +13,11 @@ public class Tenant : AuditableEntity
     public int TenantTypeId { get; private set; }
     public int PlanId { get; private set; }
     public bool IsActive { get; private set; }
+    
+    /// <summary>
+    /// Default email address for notifications. If null/empty, email notifications will not be sent.
+    /// </summary>
+    public string? DefaultNotificationEmail { get; private set; }
 
     // Navigation properties
     public LookupValue? TenantType { get; private set; }
@@ -69,4 +74,13 @@ public class Tenant : AuditableEntity
 
     public void Activate() => IsActive = true;
     public void Deactivate() => IsActive = false;
+
+    /// <summary>
+    /// Sets the default notification email for the tenant.
+    /// </summary>
+    /// <param name="email">The email address, or null to disable email notifications.</param>
+    public void SetDefaultNotificationEmail(string? email)
+    {
+        DefaultNotificationEmail = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
+    }
 }
