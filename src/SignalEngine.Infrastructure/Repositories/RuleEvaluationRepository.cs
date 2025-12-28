@@ -113,4 +113,17 @@ public class RuleEvaluationRepository : IRuleEvaluationRepository
         return lookupValue?.Id 
             ?? throw new InvalidOperationException($"Lookup value {typeCode}/{valueCode} not found");
     }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// QUEUE-ONLY: This method adds the notification to the DbContext.
+    /// The notification will be persisted on SaveChanges but NEVER dispatched here.
+    /// NotificationWorker is the ONLY component that dispatches notifications.
+    /// </remarks>
+    public async Task AddNotificationAsync(
+        Notification notification,
+        CancellationToken cancellationToken = default)
+    {
+        await _context.Notifications.AddAsync(notification, cancellationToken);
+    }
 }

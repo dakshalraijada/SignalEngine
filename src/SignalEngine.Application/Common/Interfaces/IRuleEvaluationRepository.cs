@@ -89,4 +89,15 @@ public interface IRuleEvaluationRepository
         string typeCode,
         string valueCode,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Adds a notification to the queue (database).
+    /// QUEUE-ONLY: This method persists the notification but NEVER dispatches it.
+    /// Dispatch is handled exclusively by NotificationWorker.
+    /// </summary>
+    /// <param name="notification">The notification to enqueue.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task AddNotificationAsync(
+        Notification notification,
+        CancellationToken cancellationToken = default);
 }

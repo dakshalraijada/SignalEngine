@@ -116,12 +116,18 @@ public class EvaluateRulesCommandHandler : IRequestHandler<EvaluateRulesCommand,
                 SignalStatusCodes.Open,
                 cancellationToken);
 
+            // Pre-fetch the EMAIL notification channel ID (used for notification queuing)
+            var emailChannelId = await _repository.ResolveLookupIdAsync(
+                LookupTypeCodes.NotificationChannelType,
+                NotificationChannelTypeCodes.Email,
+                cancellationToken);
+
             // Step 2: Evaluate each rule
             foreach (var rule in rules)
             {
                 try
                 {
-                    var result = await EvaluateRuleAsync(rule, openStatusId, cancellationToken);
+                    var result = await EvaluateRuleAsync(rule, openStatusId, emailChannelId, cancellationToken);
                     
                     switch (result)
                     {
@@ -171,6 +177,7 @@ public class EvaluateRulesCommandHandler : IRequestHandler<EvaluateRulesCommand,
     private async Task<RuleEvaluationOutcome> EvaluateRuleAsync(
         Rule rule,
         int openStatusId,
+        int emailChannelId,
         CancellationToken cancellationToken)
     {
         // Step 1: Get latest metric data for this rule
@@ -216,7 +223,7 @@ public class EvaluateRulesCommandHandler : IRequestHandler<EvaluateRulesCommand,
             // Check if we've reached the threshold for signal creation
             if (signalState.ConsecutiveBreaches >= rule.ConsecutiveBreachesRequired)
             {
-                await CreateSignalAsync(rule, latestData.Value, operatorCode, openStatusId, cancellationToken);
+                await CreateSignalAsync(rule, latestData.Value, operatorCode, openStatusId, emailChannelId, cancellationToken);
                 
                 // Reset state to start new breach cycle
                 signalState.Reset();
@@ -239,14 +246,19 @@ public class EvaluateRulesCommandHandler : IRequestHandler<EvaluateRulesCommand,
     }
 
     /// <summary>
-    /// Creates a new signal for a breached rule.
-    /// Signals are immutable after creation.
+    /// Creates a new signal for a breached rule and queues a notification.
+    /// 
+    /// === QUEUE-ONLY NOTIFICATION SEMANTICS ===
+    /// Notifications are ONLY persisted to the database (queued).
+    /// NotificationWorker is the SOLE component that dispatches notifications.
+    /// This method NEVER sends emails or webhooks directly.
     /// </summary>
     private async Task CreateSignalAsync(
         Rule rule,
         decimal metricValue,
         string operatorCode,
         int openStatusId,
+        int emailChannelId,
         CancellationToken cancellationToken)
     {
         var severityCode = rule.Severity?.Code
@@ -264,9 +276,24 @@ public class EvaluateRulesCommandHandler : IRequestHandler<EvaluateRulesCommand,
             description: BuildSignalDescription(rule, metricValue, operatorCode));
 
         await _repository.AddSignalAsync(signal, cancellationToken);
+        
+        // Save to get the signal ID for notification
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Queue notification for dispatch by NotificationWorker
+        // QUEUE-ONLY: This persists to DB but NEVER dispatches
+        var notification = new Notification(
+            tenantId: rule.TenantId,
+            signalId: signal.Id,
+            channelTypeId: emailChannelId,
+            recipient: "admin@signalengine.local", // TODO: Get from tenant/rule configuration
+            subject: signal.Title,
+            body: signal.Description ?? signal.Title);
+
+        await _repository.AddNotificationAsync(notification, cancellationToken);
 
         _logger.LogInformation(
-            "Signal created for rule {RuleId} ({RuleName}): Value={Value}, Threshold={Threshold}, Severity={Severity}",
+            "Signal created for rule {RuleId} ({RuleName}): Value={Value}, Threshold={Threshold}, Severity={Severity}. Notification queued.",
             rule.Id, rule.Name, metricValue, rule.Threshold, severityCode);
     }
 
