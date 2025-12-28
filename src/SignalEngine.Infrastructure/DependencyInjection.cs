@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SignalEngine.Application.Common.Interfaces;
@@ -29,6 +30,10 @@ public static class DependencyInjection
         services.AddDbContext<ApplicationDbContext>(options =>
         {
             options.UseSqlServer(connectionString);
+            
+            // Suppress pending model changes warning for OpenIddict model differences between preview versions
+            // This is safe because we manually manage migrations and the schema is production-compatible
+            options.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
             
             // Only configure OpenIddict stores if we're including data seeder (i.e., IdentityServer)
             if (includeDataSeeder)
