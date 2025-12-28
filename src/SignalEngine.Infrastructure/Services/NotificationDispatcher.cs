@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using SignalEngine.Application.Common.Interfaces;
 using SignalEngine.Domain.Constants;
 using SignalEngine.Domain.Entities;
+using SignalEngine.Infrastructure.Services.Email;
 
 namespace SignalEngine.Infrastructure.Services;
 
@@ -13,13 +14,14 @@ namespace SignalEngine.Infrastructure.Services;
 /// 
 /// Currently implemented:
 /// - Webhook: Real HTTP POST to the recipient URL
-/// - Email: Stub (logs only)
+/// - Email: Real SMTP delivery via IEmailSender
 /// - Slack: Stub (logs only)
 /// </summary>
 public class NotificationDispatcher : INotificationDispatcher
 {
     private readonly ILookupRepository _lookupRepository;
     private readonly HttpClient _httpClient;
+    private readonly IEmailSender _emailSender;
     private readonly ILogger<NotificationDispatcher> _logger;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -31,10 +33,12 @@ public class NotificationDispatcher : INotificationDispatcher
     public NotificationDispatcher(
         ILookupRepository lookupRepository,
         HttpClient httpClient,
+        IEmailSender emailSender,
         ILogger<NotificationDispatcher> logger)
     {
         _lookupRepository = lookupRepository;
         _httpClient = httpClient;
+        _emailSender = emailSender;
         _logger = logger;
     }
 
@@ -59,15 +63,57 @@ public class NotificationDispatcher : INotificationDispatcher
         }
     }
 
-    private Task<bool> SendEmailAsync(Notification notification, CancellationToken cancellationToken)
+    private async Task<bool> SendEmailAsync(Notification notification, CancellationToken cancellationToken)
     {
-        // Stub implementation - replace with actual email service (e.g., SendGrid, SMTP)
-        _logger.LogInformation(
-            "Email notification sent to {Recipient}: {Subject}",
-            notification.Recipient,
-            notification.Subject);
+        var recipient = notification.Recipient;
 
-        return Task.FromResult(true);
+        // Validate recipient email address
+        if (string.IsNullOrWhiteSpace(recipient))
+        {
+            _logger.LogWarning(
+                "Email notification {NotificationId} has no recipient address",
+                notification.Id);
+            return false;
+        }
+
+        // Basic email format validation
+        if (!recipient.Contains('@') || !recipient.Contains('.'))
+        {
+            _logger.LogWarning(
+                "Email notification {NotificationId} has invalid recipient address: {Recipient}",
+                notification.Id,
+                recipient);
+            return false;
+        }
+
+        try
+        {
+            await _emailSender.SendAsync(
+                recipient,
+                notification.Subject,
+                notification.Body,
+                cancellationToken);
+
+            _logger.LogInformation(
+                "Email notification {NotificationId} sent successfully to {Recipient}",
+                notification.Id,
+                recipient);
+
+            return true;
+        }
+        catch (TaskCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to send email notification {NotificationId} to {Recipient}",
+                notification.Id,
+                recipient);
+            return false;
+        }
     }
 
     /// <summary>

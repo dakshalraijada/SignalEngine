@@ -8,6 +8,7 @@ using SignalEngine.Infrastructure.Persistence;
 using SignalEngine.Infrastructure.Repositories;
 using SignalEngine.Infrastructure.Services;
 using SignalEngine.Infrastructure.Services.DataSources;
+using SignalEngine.Infrastructure.Services.Email;
 
 namespace SignalEngine.Infrastructure;
 
@@ -70,6 +71,10 @@ public static class DependencyInjection
         services.AddScoped<ITenantAccessor, TenantAccessor>();
 
         // Register services
+        
+        // Configure Email options and sender
+        services.Configure<EmailOptions>(configuration.GetSection("Email"));
+        services.AddSingleton<IEmailSender, SmtpEmailSender>();
         
         // Register HttpClient for NotificationDispatcher (webhook HTTP POST)
         services.AddHttpClient<NotificationDispatcher>(client =>
