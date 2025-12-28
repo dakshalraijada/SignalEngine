@@ -61,8 +61,7 @@ public class IngestMetricCommandHandler : IRequestHandler<IngestMetricCommand, i
                 request.AssetId,
                 request.Name,
                 metricTypeId,
-                request.Unit,
-                request.Source);
+                request.Unit);
 
             await _metricRepository.AddAsync(metric, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken); // Save to get metric ID

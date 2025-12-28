@@ -28,9 +28,6 @@ public class IngestMetricCommandValidator : AbstractValidator<IngestMetricComman
 
         RuleFor(x => x.Unit)
             .MaximumLength(50).WithMessage("Unit cannot exceed 50 characters.");
-
-        RuleFor(x => x.Source)
-            .MaximumLength(200).WithMessage("Source cannot exceed 200 characters.");
     }
 
     private async Task<bool> BeValidMetricTypeCode(string code, CancellationToken cancellationToken)

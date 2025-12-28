@@ -15,6 +15,19 @@ public static class LookupTypeCodes
     public const string SignalStatus = "SIGNAL_STATUS";
     public const string NotificationChannelType = "NOTIFICATION_CHANNEL_TYPE";
     public const string RuleEvaluationFrequency = "RULE_EVALUATION_FREQUENCY";
+    public const string DataSource = "DATA_SOURCE";
+}
+
+/// <summary>
+/// Defines lookup value codes for DATA_SOURCE.
+/// Used by Asset.DataSourceId to indicate where data originates.
+/// </summary>
+public static class DataSourceCodes
+{
+    public const string Binance = "BINANCE";
+    public const string Coinbase = "COINBASE";
+    public const string Kraken = "KRAKEN";
+    public const string CustomApi = "CUSTOM_API";
 }
 
 /// <summary>

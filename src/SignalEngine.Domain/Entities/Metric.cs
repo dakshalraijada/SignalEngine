@@ -6,6 +6,7 @@ namespace SignalEngine.Domain.Entities;
 /// Represents a metric definition for an asset.
 /// Actual time-series values are stored in MetricData (append-only).
 /// MetricTypeId references LookupValues (METRIC_TYPE: NUMERIC, PERCENTAGE, RATE).
+/// Data source is now defined at the Asset level, not the Metric level.
 /// </summary>
 public class Metric : AuditableEntity, ITenantScoped
 {
@@ -14,7 +15,6 @@ public class Metric : AuditableEntity, ITenantScoped
     public string Name { get; private set; } = null!;
     public int MetricTypeId { get; private set; }
     public string? Unit { get; private set; }
-    public string? Source { get; private set; }
     public bool IsActive { get; private set; }
 
     // Navigation properties
@@ -31,8 +31,7 @@ public class Metric : AuditableEntity, ITenantScoped
         int assetId,
         string name,
         int metricTypeId,
-        string? unit = null,
-        string? source = null)
+        string? unit = null)
     {
         if (tenantId <= 0)
             throw new ArgumentException("Tenant ID must be positive.", nameof(tenantId));
@@ -51,18 +50,16 @@ public class Metric : AuditableEntity, ITenantScoped
         Name = name;
         MetricTypeId = metricTypeId;
         Unit = unit;
-        Source = source;
         IsActive = true;
     }
 
-    public void Update(string name, string? unit, string? source)
+    public void Update(string name, string? unit)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Metric name is required.", nameof(name));
 
         Name = name;
         Unit = unit;
-        Source = source;
     }
 
     public void Activate() => IsActive = true;

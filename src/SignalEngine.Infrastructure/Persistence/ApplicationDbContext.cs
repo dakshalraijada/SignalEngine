@@ -119,15 +119,13 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<Notification>()
             .HasQueryFilter(e => !IsTenantFilteringEnabled || e.TenantId == CurrentTenantId);
 
-        // Metric is tenant-scoped through Asset relationship
-        // Apply filter via Asset navigation (null-forgiving: Asset is required FK)
+        // Metric has explicit TenantId - use direct filter for performance
         builder.Entity<Metric>()
-            .HasQueryFilter(e => !IsTenantFilteringEnabled || e.Asset!.TenantId == CurrentTenantId);
+            .HasQueryFilter(e => !IsTenantFilteringEnabled || e.TenantId == CurrentTenantId);
 
-        // MetricData is tenant-scoped through Metric->Asset relationship
-        // Null-forgiving operators used because these are required FK relationships
+        // MetricData has explicit TenantId - use direct filter for performance
         builder.Entity<MetricData>()
-            .HasQueryFilter(e => !IsTenantFilteringEnabled || e.Metric!.Asset!.TenantId == CurrentTenantId);
+            .HasQueryFilter(e => !IsTenantFilteringEnabled || e.TenantId == CurrentTenantId);
 
         // SignalResolution inherits tenant from Signal
         builder.Entity<SignalResolution>()

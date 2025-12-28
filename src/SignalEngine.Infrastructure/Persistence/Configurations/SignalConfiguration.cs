@@ -56,6 +56,12 @@ public class SignalConfiguration : IEntityTypeConfiguration<Signal>
             .IsDescending(false, true)
             .HasDatabaseName("IX_Signals_TenantId_TriggeredAt");
 
+        // Foreign key to Tenants
+        builder.HasOne<Tenant>()
+            .WithMany()
+            .HasForeignKey(e => e.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Foreign key to LookupValues for SignalStatus
         builder.HasOne(e => e.SignalStatus)
             .WithMany()

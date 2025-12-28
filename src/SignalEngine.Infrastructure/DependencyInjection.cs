@@ -7,6 +7,7 @@ using SignalEngine.Infrastructure.Identity;
 using SignalEngine.Infrastructure.Persistence;
 using SignalEngine.Infrastructure.Repositories;
 using SignalEngine.Infrastructure.Services;
+using SignalEngine.Infrastructure.Services.DataSources;
 
 namespace SignalEngine.Infrastructure;
 
@@ -61,6 +62,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<IPlanRepository, PlanRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<IIngestionRepository, IngestionRepository>();
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ApplicationDbContext>());
 
         // Register tenant accessor for multi-tenant query filtering
@@ -68,6 +70,11 @@ public static class DependencyInjection
 
         // Register services
         services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
+        
+        // Register data source providers for metric ingestion
+        services.AddScoped<IDataSourceProvider, BinanceDataSourceProvider>();
+        services.AddScoped<IDataSourceProvider, CustomApiDataSourceProvider>();
+        services.AddScoped<IDataSourceProviderFactory, DataSourceProviderFactory>();
         
         // Only register DataSeeder for IdentityServer (needs OpenIddict managers)
         if (includeDataSeeder)

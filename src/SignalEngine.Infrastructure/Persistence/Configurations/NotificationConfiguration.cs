@@ -55,6 +55,12 @@ public class NotificationConfiguration : IEntityTypeConfiguration<Notification>
         builder.HasIndex(e => new { e.TenantId, e.IsSent, e.CreatedAt })
             .HasDatabaseName("IX_Notifications_TenantId_IsSent_CreatedAt");
 
+        // Foreign key to Tenants
+        builder.HasOne<Tenant>()
+            .WithMany()
+            .HasForeignKey(e => e.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Foreign key to LookupValues for ChannelType
         builder.HasOne(e => e.ChannelType)
             .WithMany()

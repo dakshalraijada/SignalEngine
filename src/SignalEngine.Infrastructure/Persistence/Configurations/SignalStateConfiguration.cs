@@ -42,5 +42,17 @@ public class SignalStateConfiguration : IEntityTypeConfiguration<SignalState>
             .IsUnique();
 
         builder.HasIndex(e => e.TenantId);
+
+        // Foreign key to Rules (one state per rule)
+        builder.HasOne<Rule>()
+            .WithMany()
+            .HasForeignKey(e => e.RuleId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Foreign key to Tenants
+        builder.HasOne<Tenant>()
+            .WithMany()
+            .HasForeignKey(e => e.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

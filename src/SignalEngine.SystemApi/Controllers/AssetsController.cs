@@ -42,6 +42,7 @@ public class AssetsController : ControllerBase
             Name = a.Name,
             Identifier = a.Identifier,
             AssetTypeId = a.AssetTypeId,
+            DataSourceId = a.DataSourceId,
             Description = a.Description,
             Metadata = a.Metadata,
             IsActive = a.IsActive,
@@ -81,6 +82,7 @@ public class AssetsController : ControllerBase
             Name = asset.Name,
             Identifier = asset.Identifier,
             AssetTypeId = asset.AssetTypeId,
+            DataSourceId = asset.DataSourceId,
             Description = asset.Description,
             Metadata = asset.Metadata,
             IsActive = asset.IsActive,
@@ -113,6 +115,7 @@ public class AssetsController : ControllerBase
             name: request.Name,
             identifier: request.Identifier,
             assetTypeId: request.AssetTypeId,
+            dataSourceId: request.DataSourceId,
             description: request.Description,
             metadata: request.Metadata
         );
@@ -128,6 +131,7 @@ public class AssetsController : ControllerBase
             Name = asset.Name,
             Identifier = asset.Identifier,
             AssetTypeId = asset.AssetTypeId,
+            DataSourceId = asset.DataSourceId,
             Description = asset.Description,
             Metadata = asset.Metadata,
             IsActive = asset.IsActive,
@@ -177,6 +181,7 @@ public class AssetsController : ControllerBase
             Name = asset.Name,
             Identifier = asset.Identifier,
             AssetTypeId = asset.AssetTypeId,
+            DataSourceId = asset.DataSourceId,
             Description = asset.Description,
             Metadata = asset.Metadata,
             IsActive = asset.IsActive,
@@ -292,6 +297,7 @@ public record AssetResponse
     public string Name { get; init; } = string.Empty;
     public string Identifier { get; init; } = string.Empty;
     public int AssetTypeId { get; init; }
+    public int DataSourceId { get; init; }
     public string? Description { get; init; }
     public string? Metadata { get; init; }
     public bool IsActive { get; init; }
@@ -303,6 +309,7 @@ public record CreateAssetRequest
     public string Name { get; init; } = string.Empty;
     public string Identifier { get; init; } = string.Empty;
     public int AssetTypeId { get; init; }
+    public int DataSourceId { get; init; }
     public string? Description { get; init; }
     public string? Metadata { get; init; }
 }

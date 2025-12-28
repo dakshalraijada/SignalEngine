@@ -4,6 +4,7 @@ namespace SignalEngine.Application.Metrics.Commands;
 
 /// <summary>
 /// Command to ingest a metric value.
+/// Data source is now defined at the Asset level, not in the command.
 /// </summary>
 public record IngestMetricCommand : IRequest<int>
 {
@@ -13,5 +14,4 @@ public record IngestMetricCommand : IRequest<int>
     public decimal Value { get; init; }
     public DateTime? Timestamp { get; init; }
     public string? Unit { get; init; }
-    public string? Source { get; init; }
 }

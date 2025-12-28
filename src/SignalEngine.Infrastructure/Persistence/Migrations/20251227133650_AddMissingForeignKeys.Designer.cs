@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SignalEngine.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using SignalEngine.Infrastructure.Persistence;
 namespace SignalEngine.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251227133650_AddMissingForeignKeys")]
+    partial class AddMissingForeignKeys
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -356,9 +359,6 @@ namespace SignalEngine.Infrastructure.Persistence.Migrations
                     b.Property<int?>("CreatedBy")
                         .HasColumnType("int");
 
-                    b.Property<int>("DataSourceId")
-                        .HasColumnType("int");
-
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
@@ -394,11 +394,7 @@ namespace SignalEngine.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("AssetTypeId");
 
-                    b.HasIndex("DataSourceId");
-
                     b.HasIndex("TenantId");
-
-                    b.HasIndex("TenantId", "DataSourceId");
 
                     b.HasIndex("TenantId", "Identifier")
                         .IsUnique();
@@ -528,6 +524,10 @@ namespace SignalEngine.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Source")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<int>("TenantId")
                         .HasColumnType("int");
@@ -1229,12 +1229,6 @@ namespace SignalEngine.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SignalEngine.Domain.Entities.LookupValue", "DataSource")
-                        .WithMany()
-                        .HasForeignKey("DataSourceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("SignalEngine.Domain.Entities.Tenant", "Tenant")
                         .WithMany("Assets")
                         .HasForeignKey("TenantId")
@@ -1242,8 +1236,6 @@ namespace SignalEngine.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("AssetType");
-
-                    b.Navigation("DataSource");
 
                     b.Navigation("Tenant");
                 });

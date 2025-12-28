@@ -31,9 +31,6 @@ public class MetricConfiguration : IEntityTypeConfiguration<Metric>
         builder.Property(e => e.Unit)
             .HasMaxLength(50);
 
-        builder.Property(e => e.Source)
-            .HasMaxLength(200);
-
         builder.Property(e => e.IsActive)
             .IsRequired()
             .HasDefaultValue(true);
@@ -44,6 +41,12 @@ public class MetricConfiguration : IEntityTypeConfiguration<Metric>
         builder.HasIndex(e => e.TenantId);
         builder.HasIndex(e => new { e.AssetId, e.Name })
             .IsUnique();
+
+        // Foreign key to Tenants (explicit tenant scope for query performance)
+        builder.HasOne<Tenant>()
+            .WithMany()
+            .HasForeignKey(e => e.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // Foreign key to LookupValues for MetricType
         builder.HasOne(e => e.MetricType)

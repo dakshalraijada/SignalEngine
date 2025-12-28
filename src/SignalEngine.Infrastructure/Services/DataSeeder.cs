@@ -67,7 +67,8 @@ public class DataSeeder
             new { Code = LookupTypeCodes.MetricType, Description = "Types of metrics" },
             new { Code = LookupTypeCodes.SignalStatus, Description = "Signal status values" },
             new { Code = LookupTypeCodes.NotificationChannelType, Description = "Notification delivery channels" },
-            new { Code = LookupTypeCodes.RuleEvaluationFrequency, Description = "Rule evaluation frequency intervals" }
+            new { Code = LookupTypeCodes.RuleEvaluationFrequency, Description = "Rule evaluation frequency intervals" },
+            new { Code = LookupTypeCodes.DataSource, Description = "Data sources for asset ingestion" }
         };
 
         foreach (var lt in lookupTypes)
@@ -130,7 +131,13 @@ public class DataSeeder
             // RULE_EVALUATION_FREQUENCY
             new { TypeCode = LookupTypeCodes.RuleEvaluationFrequency, Code = RuleEvaluationFrequencyCodes.OneMinute, Name = "Every 1 Minute", SortOrder = 1 },
             new { TypeCode = LookupTypeCodes.RuleEvaluationFrequency, Code = RuleEvaluationFrequencyCodes.FiveMinutes, Name = "Every 5 Minutes", SortOrder = 2 },
-            new { TypeCode = LookupTypeCodes.RuleEvaluationFrequency, Code = RuleEvaluationFrequencyCodes.FifteenMinutes, Name = "Every 15 Minutes", SortOrder = 3 }
+            new { TypeCode = LookupTypeCodes.RuleEvaluationFrequency, Code = RuleEvaluationFrequencyCodes.FifteenMinutes, Name = "Every 15 Minutes", SortOrder = 3 },
+
+            // DATA_SOURCE - where asset data comes from
+            new { TypeCode = LookupTypeCodes.DataSource, Code = DataSourceCodes.Binance, Name = "Binance Exchange", SortOrder = 1 },
+            new { TypeCode = LookupTypeCodes.DataSource, Code = DataSourceCodes.Coinbase, Name = "Coinbase Exchange", SortOrder = 2 },
+            new { TypeCode = LookupTypeCodes.DataSource, Code = DataSourceCodes.Kraken, Name = "Kraken Exchange", SortOrder = 3 },
+            new { TypeCode = LookupTypeCodes.DataSource, Code = DataSourceCodes.CustomApi, Name = "Custom API", SortOrder = 4 }
         };
 
         foreach (var lv in lookupValues)
@@ -351,10 +358,12 @@ public class DataSeeder
 
         var cryptoTypeId = await GetLookupValueIdAsync(LookupTypeCodes.AssetType, AssetTypeCodes.Crypto);
         var websiteTypeId = await GetLookupValueIdAsync(LookupTypeCodes.AssetType, AssetTypeCodes.Website);
+        var binanceSourceId = await GetLookupValueIdAsync(LookupTypeCodes.DataSource, DataSourceCodes.Binance);
+        var customApiSourceId = await GetLookupValueIdAsync(LookupTypeCodes.DataSource, DataSourceCodes.CustomApi);
 
-        // Create sample assets
-        var btcAsset = new Asset(tenant.Id, "Bitcoin", "BTC", cryptoTypeId, "Bitcoin cryptocurrency");
-        var webAsset = new Asset(tenant.Id, "Main Website", "https://www.example.com", websiteTypeId, "Company main website");
+        // Create sample assets (now with DataSourceId)
+        var btcAsset = new Asset(tenant.Id, "Bitcoin", "BTC", cryptoTypeId, binanceSourceId, "Bitcoin cryptocurrency");
+        var webAsset = new Asset(tenant.Id, "Main Website", "https://www.example.com", websiteTypeId, customApiSourceId, "Company main website");
 
         await _context.Assets.AddRangeAsync(btcAsset, webAsset);
         await _context.SaveChangesAsync();

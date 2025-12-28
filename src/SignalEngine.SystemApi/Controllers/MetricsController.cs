@@ -39,8 +39,7 @@ public class MetricsController : ControllerBase
             MetricTypeCode = request.MetricTypeCode,
             Value = request.Value,
             Timestamp = request.Timestamp ?? DateTime.UtcNow,
-            Unit = request.Unit,
-            Source = request.Source
+            Unit = request.Unit
         };
 
         var metricId = await _mediator.Send(command, cancellationToken);
@@ -83,8 +82,7 @@ public class MetricsController : ControllerBase
                     MetricTypeCode = metric.MetricTypeCode,
                     Value = metric.Value,
                     Timestamp = metric.Timestamp ?? DateTime.UtcNow,
-                    Unit = metric.Unit,
-                    Source = metric.Source
+                    Unit = metric.Unit
                 };
 
                 var metricId = await _mediator.Send(command, cancellationToken);
@@ -126,7 +124,6 @@ public record IngestMetricRequest
     public decimal Value { get; init; }
     public DateTime? Timestamp { get; init; }
     public string? Unit { get; init; }
-    public string? Source { get; init; }
 }
 
 public record BatchIngestMetricRequest
