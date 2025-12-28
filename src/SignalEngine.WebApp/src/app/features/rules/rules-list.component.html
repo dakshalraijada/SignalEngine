@@ -1,0 +1,74 @@
+<div class="page-container">
+  <div class="page-header">
+    <h1>Rules</h1>
+    <p class="subtitle">Manage your signal evaluation rules</p>
+  </div>
+
+  <!-- Loading State -->
+  @if (loading) {
+    <div class="loading-container">
+      <div class="spinner"></div>
+      <p>Loading rules...</p>
+    </div>
+  }
+
+  <!-- Error State -->
+  @if (error && !loading) {
+    <div class="error-container">
+      <p class="error-message">{{ error }}</p>
+      <button class="btn btn-secondary" (click)="loadRules()">Try Again</button>
+    </div>
+  }
+
+  <!-- Empty State -->
+  @if (!loading && !error && rules.length === 0) {
+    <div class="empty-container">
+      <p>No rules configured yet.</p>
+    </div>
+  }
+
+  <!-- Data Table -->
+  @if (!loading && !error && rules.length > 0) {
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Condition</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (rule of rules; track rule.id) {
+            <tr>
+              <td class="cell-name">{{ rule.name }}</td>
+              <td class="cell-condition cell-mono">{{ formatCondition(rule) }}</td>
+              <td>
+                <span class="status-badge" [class]="getStatusClass(rule.isActive)">
+                  {{ getStatusText(rule.isActive) }}
+                </span>
+              </td>
+              <td class="cell-actions">
+                @if (rule.isActive) {
+                  <button 
+                    class="btn btn-sm btn-danger" 
+                    (click)="disableRule(rule)"
+                    [disabled]="disablingRuleId === rule.id">
+                    @if (disablingRuleId === rule.id) {
+                      Disabling...
+                    } @else {
+                      Disable
+                    }
+                  </button>
+                } @else {
+                  <span class="text-muted">—</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

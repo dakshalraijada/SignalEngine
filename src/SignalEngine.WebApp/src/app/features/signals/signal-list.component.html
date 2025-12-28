@@ -1,0 +1,54 @@
+<div class="page">
+  <div class="page-header">
+    <h1>Signals</h1>
+    <p class="subtitle">Triggered alerts from rule evaluations</p>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="loading">
+    <div class="spinner"></div>
+    <span>Loading signals...</span>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error" class="error">
+    <span class="error-icon">⚠️</span>
+    <span>{{ error }}</span>
+    <button class="btn-retry" (click)="loadSignals()">Retry</button>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!loading && !error && signals.length === 0" class="empty">
+    <span class="empty-icon">📭</span>
+    <p>No signals yet</p>
+    <p class="empty-hint">Signals will appear here when rules are breached.</p>
+  </div>
+
+  <!-- Signals Table -->
+  <div *ngIf="!loading && !error && signals.length > 0" class="table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Triggered At</th>
+          <th>Title</th>
+          <th>Trigger Value</th>
+          <th>Threshold</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let signal of signals">
+          <td class="cell-date">{{ signal.triggeredAt | date:'short' }}</td>
+          <td class="cell-title">{{ signal.title }}</td>
+          <td class="cell-number">{{ signal.triggerValue | number:'1.2-6' }}</td>
+          <td class="cell-number">{{ signal.thresholdValue | number:'1.2-6' }}</td>
+          <td>
+            <span class="badge" [ngClass]="getStatusClass(signal.statusCode)">
+              {{ signal.statusCode }}
+            </span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

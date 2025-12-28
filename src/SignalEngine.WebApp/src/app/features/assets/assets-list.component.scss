@@ -1,0 +1,7 @@
+@use '../../../styles/shared' as *;
+
+.identifier-badge {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-weight: 600;
+  color: var(--color-primary);
+}

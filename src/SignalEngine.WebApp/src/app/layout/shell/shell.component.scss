@@ -1,0 +1,112 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #f5f7fa;
+}
+
+/* Top Navigation Bar */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 24px;
+  height: 56px;
+  background-color: #1a1a2e;
+  color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-brand {
+  display: flex;
+  align-items: center;
+}
+
+.app-name {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+
+.navbar-user {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.user-email {
+  font-size: 14px;
+  color: #a0a0a0;
+}
+
+.btn-logout {
+  padding: 8px 16px;
+  background-color: transparent;
+  border: 1px solid #4a4a6a;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: #4a4a6a;
+  }
+}
+
+/* Shell Body */
+.shell-body {
+  display: flex;
+  flex: 1;
+}
+
+/* Sidebar Navigation */
+.sidebar {
+  width: 200px;
+  background-color: #ffffff;
+  border-right: 1px solid #e0e0e0;
+  padding-top: 16px;
+}
+
+.nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  color: #333;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+
+  &:hover {
+    background-color: #f0f2f5;
+  }
+
+  &.active {
+    background-color: #e8f0fe;
+    border-left-color: #1a73e8;
+    color: #1a73e8;
+  }
+}
+
+.nav-icon {
+  margin-right: 12px;
+  font-size: 18px;
+}
+
+.nav-label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Main Content Area */
+.content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+}

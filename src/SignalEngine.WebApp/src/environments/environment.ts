@@ -8,5 +8,6 @@ export const environment = {
     silentRenewUrl: 'https://localhost:4200/silent-refresh',
     scope: 'openid profile email system-api'
   },
-  apiUrl: 'https://localhost:7220/api'
+  apiUrl: 'https://localhost:7220/api',
+  systemApiUrl: 'https://localhost:7005/api'
 };

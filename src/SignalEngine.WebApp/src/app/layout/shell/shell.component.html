@@ -1,0 +1,43 @@
+<div class="shell">
+  <!-- Top Navigation Bar -->
+  <header class="navbar">
+    <div class="navbar-brand">
+      <span class="app-name">SignalEngine</span>
+    </div>
+    <div class="navbar-user">
+      <span class="user-email">{{ userEmail }}</span>
+      <button class="btn-logout" (click)="logout()">Logout</button>
+    </div>
+  </header>
+
+  <div class="shell-body">
+    <!-- Left Sidebar Navigation -->
+    <nav class="sidebar">
+      <ul class="nav-list">
+        <li>
+          <a routerLink="/signals" routerLinkActive="active" class="nav-link">
+            <span class="nav-icon">📊</span>
+            <span class="nav-label">Signals</span>
+          </a>
+        </li>
+        <li>
+          <a routerLink="/rules" routerLinkActive="active" class="nav-link">
+            <span class="nav-icon">📋</span>
+            <span class="nav-label">Rules</span>
+          </a>
+        </li>
+        <li>
+          <a routerLink="/assets" routerLinkActive="active" class="nav-link">
+            <span class="nav-icon">🏷️</span>
+            <span class="nav-label">Assets</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="content">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+</div>

@@ -1,0 +1,59 @@
+<div class="page-container">
+  <div class="page-header">
+    <h1>Assets</h1>
+    <p class="subtitle">Tracked assets and their monitoring status</p>
+  </div>
+
+  <!-- Loading State -->
+  @if (loading) {
+    <div class="loading-container">
+      <div class="spinner"></div>
+      <p>Loading assets...</p>
+    </div>
+  }
+
+  <!-- Error State -->
+  @if (error && !loading) {
+    <div class="error-container">
+      <p class="error-message">{{ error }}</p>
+      <button class="btn btn-secondary" (click)="loadAssets()">Try Again</button>
+    </div>
+  }
+
+  <!-- Empty State -->
+  @if (!loading && !error && assets.length === 0) {
+    <div class="empty-container">
+      <p>No assets configured yet.</p>
+    </div>
+  }
+
+  <!-- Data Table -->
+  @if (!loading && !error && assets.length > 0) {
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Identifier</th>
+            <th>Name</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (asset of assets; track asset.id) {
+            <tr>
+              <td class="cell-identifier">
+                <span class="identifier-badge">{{ asset.identifier }}</span>
+              </td>
+              <td class="cell-name">{{ asset.name }}</td>
+              <td>
+                <span class="status-badge" [class]="getStatusClass(asset.isActive)">
+                  {{ getStatusText(asset.isActive) }}
+                </span>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>
