@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
@@ -92,6 +93,7 @@ public class AuthorizationController : Controller
 
         // Set the list of scopes granted to the client application
         claimsPrincipal.SetScopes(request.GetScopes());
+        claimsPrincipal.SetResources(await _scopeManager.ListResourcesAsync(claimsPrincipal.GetScopes()).ToListAsync());
 
         // Set destinations for the claims
         foreach (var claim in claimsPrincipal.Claims)
@@ -201,6 +203,8 @@ public class AuthorizationController : Controller
 
     [HttpGet("~/connect/logout")]
     [HttpPost("~/connect/logout")]
+    [HttpGet("~/connect/endsession")]
+    [HttpPost("~/connect/endsession")]
     public async Task<IActionResult> Logout()
     {
         await _signInManager.SignOutAsync();
@@ -215,9 +219,22 @@ public class AuthorizationController : Controller
 
     [HttpGet("~/connect/userinfo")]
     [HttpPost("~/connect/userinfo")]
+    [Authorize(AuthenticationSchemes = OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)]
     public async Task<IActionResult> Userinfo()
     {
-        var user = await _userManager.FindByIdAsync(User.GetClaim(Claims.Subject)!);
+        var subject = User.GetClaim(Claims.Subject) ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(subject))
+        {
+            return Challenge(
+                authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                properties: new AuthenticationProperties(new Dictionary<string, string?>
+                {
+                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidToken,
+                    [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The specified access token is missing the subject claim."
+                }));
+        }
+
+        var user = await _userManager.FindByIdAsync(subject);
         if (user == null)
         {
             return Challenge(

@@ -36,7 +36,11 @@ builder.Services.AddOpenIddict()
     });
 
 // Configure authentication
-builder.Services.AddAuthentication(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme;
+});
 
 // Configure authorization - just require authentication for now
 builder.Services.AddAuthorization();

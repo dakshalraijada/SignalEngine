@@ -61,6 +61,7 @@ builder.Services.AddOpenIddict()
             "profile",
             "email",
             "roles",
+            "system-api",
             "signal.read",
             "signal.write",
             "rule.read",
@@ -69,6 +70,9 @@ builder.Services.AddOpenIddict()
         // Use development encryption and signing certificates
         options.AddDevelopmentEncryptionCertificate()
                .AddDevelopmentSigningCertificate();
+
+        // Let resource servers validate JWTs without introspection.
+        options.DisableAccessTokenEncryption();
 
         // Disable HTTPS requirement for development
         options.UseAspNetCore()
