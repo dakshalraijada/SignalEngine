@@ -133,15 +133,16 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
-
 app.UseCors("AllowAngularApp");
-
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Map OpenIddict and MVC endpoints
+app.MapControllers();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");

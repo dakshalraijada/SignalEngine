@@ -1,0 +1,10 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Add OpenIddict.Server.AspNetCore package",
+			"type": "shell",
+			"command": "dotnet add package OpenIddict.Server.AspNetCore --version 6.3.0"
+		}
+	]
+}

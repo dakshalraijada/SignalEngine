@@ -6,6 +6,9 @@ using SignalEngine.Infrastructure;
 using SignalEngine.SystemApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+// Allow CORS for Angular dev server
+var allowedOrigins = new[] { "https://localhost:4200" };
+
 
 // Add Application and Infrastructure services
 builder.Services.AddApplicationServices();
@@ -40,6 +43,15 @@ builder.Services.AddAuthorization();
 
 // Add controllers
 builder.Services.AddControllers();
+// Add CORS policy
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend",
+        policy => policy.WithOrigins(allowedOrigins)
+                          .AllowAnyHeader()
+                          .AllowAnyMethod()
+                          .AllowCredentials());
+});
 
 // Add Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
@@ -103,6 +115,9 @@ if (app.Environment.IsDevelopment())
         options.OAuthUsePkce();
     });
 }
+
+// Use CORS policy
+app.UseCors("AllowFrontend");
 
 app.UseHttpsRedirection();
 
